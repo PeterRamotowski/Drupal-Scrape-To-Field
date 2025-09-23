@@ -1,0 +1,13 @@
+administer web scraper:
+  title: 'Administer web scraper settings'
+  description: 'Configure global web scraper settings'
+  restrict access: true
+
+configure any node web scraper:
+  title: 'Configure any node web scraper'
+  description: 'Configure web scraper settings for any node'
+  restrict access: true
+
+configure own node web scraper:
+  title: 'Configure own node web scraper'
+  description: 'Configure web scraper settings for own nodes only'
