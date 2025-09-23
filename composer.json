@@ -1,0 +1,25 @@
+{
+  "name": "drupal/scrape_to_field",
+  "type": "drupal-module",
+  "description": "Provides web scraping functionality for content type fields with background processing.",
+  "keywords": ["Drupal"],
+  "license": "GPL-2.0-or-later",
+  "homepage": "https://drupal.org/project/scrape_to_field",
+  "minimum-stability": "dev",
+  "support": {
+    "issues": "https://drupal.org/project/issues/scrape_to_field",
+    "source": "https://git.drupalcode.org/project/scrape_to_field"
+  },
+  "authors": [
+    {
+      "name": "ramotowski",
+      "homepage": "https://www.drupal.org/user/64249"
+    }
+  ],
+  "require": {
+    "guzzlehttp/guzzle": "^7.0",
+    "symfony/dom-crawler": "^6.0 || ^7.0",
+    "symfony/css-selector": "^6.0 || ^7.0",
+    "drupal/core": "^11"
+  }
+}
