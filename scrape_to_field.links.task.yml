@@ -1,0 +1,5 @@
+scrape_to_field.node_scraper_config:
+  route_name: scrape_to_field.node_scraper_config
+  title: 'Scraper Config'
+  base_route: entity.node.canonical
+  weight: 10

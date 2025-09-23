@@ -1,0 +1,17 @@
+scrape_to_field.admin_config:
+  path: '/admin/config/content/web-scraper'
+  defaults:
+    _form: 'Drupal\scrape_to_field\Form\WebScraperSettingsForm'
+    _title: 'Web Scraper Settings'
+  requirements:
+    _permission: 'administer web scraper'
+
+scrape_to_field.node_scraper_config:
+  path: '/node/{node}/scraper-config'
+  defaults:
+    _form: 'Drupal\scrape_to_field\Form\NodeScraperConfigForm'
+    _title: 'Configure Web Scraper'
+  requirements:
+    _custom_access: '\Drupal\scrape_to_field\Access\NodeScraperConfigAccess::access'
+  options:
+    _admin_route: TRUE
