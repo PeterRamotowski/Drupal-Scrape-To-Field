@@ -257,6 +257,47 @@ class NodeScraperConfigForm extends FormBase
       ],
     ];
 
+    // Search and replace configuration for cleaning scraped values.
+    $form['extraction_config']['enable_cleaning'] = [
+      '#type' => 'checkbox',
+      '#title' => $this->t('Enable value cleaning'),
+      '#default_value' => !empty($field_config['enable_cleaning']),
+      '#description' => $this->t('Enable search and replace operations to clean or transform scraped values.'),
+      '#states' => $states_visible,
+    ];
+
+    $cleaning_states_visible = [
+      'visible' => [
+        ':input[name="field_' . $field_name . '[enabled]"]' => ['checked' => TRUE],
+        ':input[name="field_' . $field_name . '[extraction_config][enable_cleaning]"]' => ['checked' => TRUE],
+      ],
+    ];
+
+    $form['extraction_config']['cleaning_operations'] = [
+      '#type' => 'fieldset',
+      '#title' => $this->t('Cleaning operations'),
+      '#states' => $cleaning_states_visible,
+    ];
+
+    // Convert cleaning_operations array back to textarea format for display
+    $operations_text = '';
+    if (!empty($field_config['cleaning_operations'])) {
+      foreach ($field_config['cleaning_operations'] as $operation) {
+        if (!empty($operation['search'])) {
+          $operations_text .= $operation['search'] . '|' . ($operation['replace'] ?? '') . "\n";
+        }
+      }
+    }
+
+    $form['extraction_config']['cleaning_operations']['operations_text'] = [
+      '#type' => 'textarea',
+      '#title' => $this->t('Search and replace operations'),
+      '#default_value' => trim($operations_text),
+      '#description' => $this->t('Enter search and replace operations, one per line.<br/>Format: <strong>search_text|replace_text</strong>.<br/>Leave replace_text empty to remove the search text.<br/>Operations are applied in order.<br/>Examples:<br/><pre>$|<br/>$|USD<br/>Price:|<br/>.00|<br/>kg|kilograms</pre>'),
+      '#rows' => 5,
+      '#states' => $cleaning_states_visible,
+    ];
+
     // Field-specific options based on field type.
     $field_type = $field_definition->getType();
     $cardinality = $field_definition->getFieldStorageDefinition()->getCardinality();
@@ -398,12 +439,18 @@ class NodeScraperConfigForm extends FormBase
       return $result;
     }
 
-    // Test the configuration using the scraper service
+    $extraction_config = $field_values['extraction_config'] ?? [];
+    if (!empty($extraction_config['enable_cleaning']) && !empty($extraction_config['cleaning_operations']['operations_text'])) {
+      $operations_text = $extraction_config['cleaning_operations']['operations_text'];
+      $cleaning_operations = $this->parseCleaningOperations($operations_text);
+      $extraction_config['cleaning_operations'] = $cleaning_operations;
+    }
+
     $test_result = $this->scraperService->scrapeData(
       $field_values['source_config']['url'],
       $field_values['source_config']['selector'],
       $field_values['source_config']['selector_type'] ?? 'css',
-      $field_values['extraction_config'] ?? []
+      $extraction_config
     );
 
     $success = $test_result !== NULL;
@@ -662,5 +709,38 @@ class NodeScraperConfigForm extends FormBase
     }
 
     return NULL;
+  }
+
+  /**
+   * Parses cleaning operations text into array format.
+   *
+   * @param string $operations_text
+   *   The operations text with format "search|replace" per line.
+   *
+   * @return array
+   *   Array of cleaning operations with 'search' and 'replace' keys.
+   */
+  protected function parseCleaningOperations(string $operations_text): array
+  {
+    $lines = explode("\n", $operations_text);
+    $cleaning_operations = [];
+
+    foreach ($lines as $line) {
+      $line = trim($line);
+      if (!empty($line)) {
+        $parts = explode('|', $line, 2);
+        $search = $parts[0] ?? '';
+        $replace = isset($parts[1]) ? $parts[1] : '';
+
+        if (!empty($search)) {
+          $cleaning_operations[] = [
+            'search' => $search,
+            'replace' => $replace,
+          ];
+        }
+      }
+    }
+
+    return $cleaning_operations;
   }
 }

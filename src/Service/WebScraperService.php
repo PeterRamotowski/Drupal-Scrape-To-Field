@@ -113,7 +113,7 @@ class WebScraperService
       $nodes->each(function (Crawler $node) use (&$data, $extract_method, $attribute) {
         switch ($extract_method) {
           case 'text':
-            $data[] = trim($node->text());
+            $data[] = $node->text();
             break;
 
           case 'html':
@@ -125,11 +125,16 @@ class WebScraperService
             break;
 
           default:
-            $data[] = trim($node->text());
+            $data[] = $node->text();
         }
       });
 
-      // Only log success for non-test operations
+      // Apply cleaning operations
+      if (!empty($options['cleaning_operations'])) {
+        $data = $this->applyCleaningOperations($data, $options['cleaning_operations']);
+      }
+
+      $is_test = $options['test_mode'] ?? false;
       if (!$is_test) {
         $this->scraperLogger->logScrapingSuccess($url, count($data));
       }
@@ -161,23 +166,75 @@ class WebScraperService
   {
     // Validate URL.
     if (!filter_var($url, FILTER_VALIDATE_URL)) {
-      return ['valid' => FALSE, 'message' => 'Invalid URL format'];
+      return [
+        'valid' => FALSE,
+        'message' => 'Invalid URL format',
+      ];
     }
 
     // Basic selector validation.
     if (empty(trim($selector))) {
-      return ['valid' => FALSE, 'message' => 'Selector cannot be empty'];
+      return [
+        'valid' => FALSE,
+        'message' => 'Selector cannot be empty',
+      ];
     }
 
     // Try a test scrape with limited timeout.
     try {
-      $test_data = $this->scrapeData($url, $selector, $selector_type, ['timeout' => 10, 'test_mode' => true]);
+      $test_data = $this->scrapeData($url, $selector, $selector_type, [
+          'timeout' => 10,
+          'test_mode' => true,
+      ]);
       if ($test_data === NULL) {
-        return ['valid' => FALSE, 'message' => 'Failed to connect to URL or selector returned no results'];
+        return [
+          'valid' => FALSE,
+          'message' => 'Failed to connect to URL or selector returned no results',
+        ];
       }
-      return ['valid' => TRUE, 'message' => 'Configuration is valid'];
+      return [
+        'valid' => TRUE,
+        'message' => 'Configuration is valid',
+      ];
     } catch (\Exception $e) {
-      return ['valid' => FALSE, 'message' => 'Test scraping failed: ' . Html::escape($e->getMessage() ?? 'Unknown error')];
+      return [
+        'valid' => FALSE,
+        'message' => 'Test scraping failed: ' . Html::escape($e->getMessage() ?? 'Unknown error'),
+      ];
     }
+  }
+
+  /**
+   * Applies cleaning operations to scraped data.
+   *
+   * @param array $data
+   *   The scraped data array.
+   * @param array $cleaning_operations
+   *   Array of cleaning operations with 'search' and 'replace' keys.
+   *
+   * @return array
+   *   The cleaned data array.
+   */
+  protected function applyCleaningOperations(array $data, array $cleaning_operations): array
+  {
+    $cleaned_data = [];
+
+    foreach ($data as $item) {
+      $cleaned_item = (string) $item;
+
+      // Apply each cleaning operation in order
+      foreach ($cleaning_operations as $operation) {
+        $search = $operation['search'] ?? '';
+        $replace = $operation['replace'] ?? '';
+
+        if (!empty($search)) {
+          $cleaned_item = str_replace($search, $replace, $cleaned_item);
+        }
+      }
+
+      $cleaned_data[] = $cleaned_item;
+    }
+
+    return $cleaned_data;
   }
 }
