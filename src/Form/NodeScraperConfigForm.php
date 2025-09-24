@@ -2,12 +2,15 @@
 
 namespace Drupal\scrape_to_field\Form;
 
+use Drupal\Component\Utility\Html;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\Core\Form\FormBase;
 use Drupal\Core\Form\FormStateInterface;
 use Drupal\node\NodeInterface;
-use Drupal\scrape_to_field\Service\WebScraperService;
+use Drupal\scrape_to_field\DTO\NodeScraperConfigDto;
+use Drupal\scrape_to_field\DTO\ScraperFieldConfigDto;
 use Drupal\scrape_to_field\Service\ScraperActivityLogger;
+use Drupal\scrape_to_field\Service\WebScraperService;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 
 /**
@@ -101,7 +104,7 @@ class NodeScraperConfigForm extends FormBase
     $form['global_settings']['scraping_enabled'] = [
       '#type' => 'checkbox',
       '#title' => $this->t('Enable scraping for this node'),
-      '#default_value' => !empty($current_config),
+      '#default_value' => $current_config->scrapingEnabled,
       '#description' => $this->t('Uncheck to temporarily disable all scraping for this node.'),
     ];
 
@@ -112,7 +115,7 @@ class NodeScraperConfigForm extends FormBase
 
     // Create configuration sections for each scraper-enabled field.
     foreach ($scraper_fields as $field_name => $field_definition) {
-      $field_config = $current_config[$field_name] ?? [];
+      $field_config = $current_config->getFieldConfig($field_name)?->toArray() ?? [];
 
       $form['field_' . $field_name] = [
         '#type' => 'details',
@@ -364,7 +367,7 @@ class NodeScraperConfigForm extends FormBase
     $form['test_config']['result'] = [
       '#type' => 'container',
       '#attributes' => ['id' => 'test-result-' . $field_name],
-      '#markup' => '<div class="messages messages--info">Click the test button to see results here.</div>',
+      '#markup' => '<div class="messages messages--info">Click the button above to see results here.</div>',
     ];
 
     // Advanced options.
@@ -399,26 +402,8 @@ class NodeScraperConfigForm extends FormBase
   public function ajaxTestConfiguration(array &$form, FormStateInterface $form_state)
   {
     $triggering_element = $form_state->getTriggeringElement();
-    $field_name = NULL;
+    $field_name = $this->extractFieldNameFromElement($triggering_element);
 
-    // Extract field name from the button's name attribute
-    $button_name = $triggering_element['#name'] ?? '';
-    if (preg_match('/^test_field_(.+)$/', $button_name, $matches)) {
-      $field_name = $matches[1];
-    }
-
-    // Fallback: try to extract from the triggering element's array parents
-    if (!$field_name) {
-      $array_parents = $triggering_element['#array_parents'] ?? [];
-      foreach ($array_parents as $parent) {
-        if (is_string($parent) && str_starts_with($parent, 'field_')) {
-          $field_name = substr($parent, 6);
-          break;
-        }
-      }
-    }
-
-    // Return the container with the correct wrapper ID and content
     $result = [
       '#type' => 'container',
       '#attributes' => [
@@ -577,9 +562,6 @@ class NodeScraperConfigForm extends FormBase
     $node = $form_state->get('node');
     $global_settings = $form_state->getValue('global_settings');
 
-    // Get current config for logging changes
-    $old_config = $this->getNodeScraperConfig($node);
-
     if (empty($global_settings['scraping_enabled'])) {
       // Clear all scraper configuration if scraping is disabled.
       $node->set('field_scraper_config', '');
@@ -590,35 +572,32 @@ class NodeScraperConfigForm extends FormBase
       return;
     }
 
-    $scraper_config = [];
+    $scraper_field_configs = [];
     $scraper_fields = $this->getScraperEnabledFields($node);
 
     foreach ($scraper_fields as $field_name => $field_definition) {
       $field_values = $form_state->getValue('field_' . $field_name);
 
       if (!empty($field_values['enabled'])) {
-        $scraper_config[$field_name] = [
-          'enabled' => TRUE,
-          'url' => $field_values['source_config']['url'],
-          'selector' => $field_values['source_config']['selector'],
-          'selector_type' => $field_values['source_config']['selector_type'],
-          'extract_method' => $field_values['extraction_config']['extract_method'],
-          'attribute' => $field_values['extraction_config']['attribute'] ?? '',
-          'multiple_handling' => $field_values['extraction_config']['multiple_handling'] ?? 'first',
-          'separator' => $field_values['extraction_config']['separator'] ?? ', ',
-          'text_format' => $field_values['extraction_config']['text_format'] ?? 'plain_text',
-          'frequency' => $field_values['advanced']['frequency'] ?? '',
-        ];
+        $cleaning_operations = [];
+        if (!empty($field_values['extraction_config']['enable_cleaning'])) {
+          $operations_text = $field_values['extraction_config']['cleaning_operations']['operations_text'] ?? '';
+          $cleaning_operations = $this->parseCleaningOperations($operations_text);
+        }
+
+        $scraper_field_configs[$field_name] = ScraperFieldConfigDto::fromFormValues(
+          $field_values,
+          $cleaning_operations
+        );
       }
     }
 
-    // Save configuration to the node.
-    $node->set('field_scraper_config', json_encode($scraper_config));
+    $node_scraper_config = new NodeScraperConfigDto(true, $scraper_field_configs);
+    $node->set('field_scraper_config', $node_scraper_config->toJson());
     $node->save();
 
     $this->scraperLogger->logConfigurationChange($node);
 
-    // Redirect back to the node.
     $form_state->setRedirect('entity.node.canonical', ['node' => $node->id()]);
   }
 
@@ -659,19 +638,21 @@ class NodeScraperConfigForm extends FormBase
   /**
    * Gets current scraper configuration for a node.
    */
-  protected function getNodeScraperConfig(NodeInterface $node): array
+  protected function getNodeScraperConfig(NodeInterface $node): NodeScraperConfigDto
   {
     if (!$node->hasField('field_scraper_config')) {
-      return [];
+      return NodeScraperConfigDto::disabled();
     }
 
     $config_field = $node->get('field_scraper_config');
     if ($config_field->isEmpty()) {
-      return [];
+      return NodeScraperConfigDto::disabled();
     }
 
     $config_value = $config_field->first()->getValue();
-    return json_decode($config_value['value'] ?? '[]', TRUE) ?: [];
+    $json = $config_value['value'] ?? '[]';
+    
+    return NodeScraperConfigDto::fromJson($json);
   }
 
   /**
@@ -694,17 +675,23 @@ class NodeScraperConfigForm extends FormBase
    */
   protected function extractFieldNameFromElement(array $element): ?string
   {
+    // Try to extract from button name attribute (for test buttons)
+    $button_name = $element['#name'] ?? '';
+    if (preg_match('/^test_field_(.+)$/', $button_name, $matches)) {
+      return $matches[1];
+    }
+
     // Try to get field name from parents
     $parents = $element['#parents'] ?? [];
     if (count($parents) >= 1 && str_starts_with($parents[0], 'field_')) {
-      return substr($parents[0], 6); // Remove 'field_' prefix
+      return substr($parents[0], 6);
     }
 
     // Try to get field name from array_parents
     $array_parents = $element['#array_parents'] ?? [];
     foreach ($array_parents as $parent) {
       if (is_string($parent) && str_starts_with($parent, 'field_')) {
-        return substr($parent, 6); // Remove 'field_' prefix
+        return substr($parent, 6);
       }
     }
 
