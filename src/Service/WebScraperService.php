@@ -4,6 +4,7 @@ namespace Drupal\scrape_to_field\Service;
 
 use Drupal\Component\Utility\Html;
 use Drupal\Core\Config\ConfigFactoryInterface;
+use Drupal\scrape_to_field\Service\DataCleaningService;
 use Drupal\scrape_to_field\Service\ScraperActivityLogger;
 use GuzzleHttp\ClientInterface;
 use GuzzleHttp\Exception\RequestException;
@@ -36,14 +37,20 @@ class WebScraperService
   protected ScraperActivityLogger $scraperLogger;
 
   /**
+   * The data cleaning service.
+   */
+  protected DataCleaningService $dataCleaningService;
+
+  /**
    * Constructs a WebScraperService object.
    */
-  public function __construct(ClientInterface $http_client, ConfigFactoryInterface $config_factory, UserAgentService $user_agent_service, ScraperActivityLogger $scraper_logger)
+  public function __construct(ClientInterface $http_client, ConfigFactoryInterface $config_factory, UserAgentService $user_agent_service, ScraperActivityLogger $scraper_logger, DataCleaningService $data_cleaning_service)
   {
     $this->httpClient = $http_client;
     $this->configFactory = $config_factory;
     $this->userAgentService = $user_agent_service;
     $this->scraperLogger = $scraper_logger;
+    $this->dataCleaningService = $data_cleaning_service;
   }
 
   /**
@@ -131,7 +138,7 @@ class WebScraperService
 
       // Apply cleaning operations
       if (!empty($options['cleaning_operations'])) {
-        $data = $this->applyCleaningOperations($data, $options['cleaning_operations']);
+        $data = $this->dataCleaningService->applyCleaningOperations($data, $options['cleaning_operations']);
       }
 
       $is_test = $options['test_mode'] ?? false;
@@ -202,39 +209,5 @@ class WebScraperService
         'message' => 'Test scraping failed: ' . Html::escape($e->getMessage() ?? 'Unknown error'),
       ];
     }
-  }
-
-  /**
-   * Applies cleaning operations to scraped data.
-   *
-   * @param array $data
-   *   The scraped data array.
-   * @param array $cleaning_operations
-   *   Array of cleaning operations with 'search' and 'replace' keys.
-   *
-   * @return array
-   *   The cleaned data array.
-   */
-  protected function applyCleaningOperations(array $data, array $cleaning_operations): array
-  {
-    $cleaned_data = [];
-
-    foreach ($data as $item) {
-      $cleaned_item = (string) $item;
-
-      // Apply each cleaning operation in order
-      foreach ($cleaning_operations as $operation) {
-        $search = $operation['search'] ?? '';
-        $replace = $operation['replace'] ?? '';
-
-        if (!empty($search)) {
-          $cleaned_item = str_replace($search, $replace, $cleaned_item);
-        }
-      }
-
-      $cleaned_data[] = $cleaned_item;
-    }
-
-    return $cleaned_data;
   }
 }

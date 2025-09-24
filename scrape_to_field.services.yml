@@ -1,7 +1,7 @@
 services:
   scrape_to_field.scraper:
     class: Drupal\scrape_to_field\Service\WebScraperService
-    arguments: ['@http_client', '@config.factory', '@scrape_to_field.user_agent', '@scrape_to_field.activity_logger']
+    arguments: ['@http_client', '@config.factory', '@scrape_to_field.user_agent', '@scrape_to_field.activity_logger', '@scrape_to_field.data_cleaning']
 
   scrape_to_field.manager:
     class: Drupal\scrape_to_field\Service\ScrapeFieldManager
@@ -17,6 +17,9 @@ services:
 
   scrape_to_field.user_agent:
     class: Drupal\scrape_to_field\Service\UserAgentService
+
+  scrape_to_field.data_cleaning:
+    class: Drupal\scrape_to_field\Service\DataCleaningService
 
   logger.channel.scrape_to_field:
     parent: logger.channel_base

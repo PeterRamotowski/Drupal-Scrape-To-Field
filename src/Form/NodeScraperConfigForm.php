@@ -9,6 +9,7 @@ use Drupal\Core\Form\FormStateInterface;
 use Drupal\node\NodeInterface;
 use Drupal\scrape_to_field\DTO\NodeScraperConfigDto;
 use Drupal\scrape_to_field\DTO\ScraperFieldConfigDto;
+use Drupal\scrape_to_field\Service\DataCleaningService;
 use Drupal\scrape_to_field\Service\ScraperActivityLogger;
 use Drupal\scrape_to_field\Service\WebScraperService;
 use Symfony\Component\DependencyInjection\ContainerInterface;
@@ -35,13 +36,19 @@ class NodeScraperConfigForm extends FormBase
   protected ScraperActivityLogger $scraperLogger;
 
   /**
+   * The data cleaning service.
+   */
+  protected DataCleaningService $dataCleaningService;
+
+  /**
    * Constructs a NodeScraperConfigForm object.
    */
-  public function __construct(EntityTypeManagerInterface $entity_type_manager, WebScraperService $scraper_service, ScraperActivityLogger $scraper_logger)
+  public function __construct(EntityTypeManagerInterface $entity_type_manager, WebScraperService $scraper_service, ScraperActivityLogger $scraper_logger, DataCleaningService $data_cleaning_service)
   {
     $this->entityTypeManager = $entity_type_manager;
     $this->scraperService = $scraper_service;
     $this->scraperLogger = $scraper_logger;
+    $this->dataCleaningService = $data_cleaning_service;
   }
 
   /**
@@ -53,6 +60,7 @@ class NodeScraperConfigForm extends FormBase
       $container->get('entity_type.manager'),
       $container->get('scrape_to_field.scraper'),
       $container->get('scrape_to_field.activity_logger'),
+      $container->get('scrape_to_field.data_cleaning'),
     );
   }
 
@@ -427,7 +435,7 @@ class NodeScraperConfigForm extends FormBase
     $extraction_config = $field_values['extraction_config'] ?? [];
     if (!empty($extraction_config['enable_cleaning']) && !empty($extraction_config['cleaning_operations']['operations_text'])) {
       $operations_text = $extraction_config['cleaning_operations']['operations_text'];
-      $cleaning_operations = $this->parseCleaningOperations($operations_text);
+      $cleaning_operations = $this->dataCleaningService->parseCleaningOperations($operations_text);
       $extraction_config['cleaning_operations'] = $cleaning_operations;
     }
 
@@ -582,7 +590,7 @@ class NodeScraperConfigForm extends FormBase
         $cleaning_operations = [];
         if (!empty($field_values['extraction_config']['enable_cleaning'])) {
           $operations_text = $field_values['extraction_config']['cleaning_operations']['operations_text'] ?? '';
-          $cleaning_operations = $this->parseCleaningOperations($operations_text);
+          $cleaning_operations = $this->dataCleaningService->parseCleaningOperations($operations_text);
         }
 
         $scraper_field_configs[$field_name] = ScraperFieldConfigDto::fromFormValues(
@@ -696,38 +704,5 @@ class NodeScraperConfigForm extends FormBase
     }
 
     return NULL;
-  }
-
-  /**
-   * Parses cleaning operations text into array format.
-   *
-   * @param string $operations_text
-   *   The operations text with format "search|replace" per line.
-   *
-   * @return array
-   *   Array of cleaning operations with 'search' and 'replace' keys.
-   */
-  protected function parseCleaningOperations(string $operations_text): array
-  {
-    $lines = explode("\n", $operations_text);
-    $cleaning_operations = [];
-
-    foreach ($lines as $line) {
-      $line = trim($line);
-      if (!empty($line)) {
-        $parts = explode('|', $line, 2);
-        $search = $parts[0] ?? '';
-        $replace = isset($parts[1]) ? $parts[1] : '';
-
-        if (!empty($search)) {
-          $cleaning_operations[] = [
-            'search' => $search,
-            'replace' => $replace,
-          ];
-        }
-      }
-    }
-
-    return $cleaning_operations;
   }
 }
