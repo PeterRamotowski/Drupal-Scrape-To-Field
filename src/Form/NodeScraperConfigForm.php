@@ -420,23 +420,24 @@ class NodeScraperConfigForm extends FormBase
       return $result;
     }
 
-    $sample_data = array_slice($test_result, 0, 3);
+    $sample_data_limit = 5;
+    $sample_data = array_slice($test_result, 0, $sample_data_limit);
 
     $output = '<div class="messages messages--status">';
     $output .= '<strong>' . $this->t('Test successful!') . '</strong><br/>';
     $output .= $this->t('Found @count results. Sample data:', ['@count' => $result_count]) . '<br/>';
     $output .= '<ul>';
     foreach ($sample_data as $item) {
-      $output .= '<li>' . htmlspecialchars(substr($item, 0, 100)) . ($item && strlen($item) > 100 ? '...' : '') . '</li>';
+      $output .= '<li>' . Html::escape(substr($item, 0, 100)) . ($item && strlen($item) > 100 ? '...' : '') . '</li>';
     }
     $output .= '</ul>';
-    if ($result_count > 3) {
-      $output .= $this->t('... and @more more results.', ['@more' => $result_count - 3]);
+    if ($result_count > $sample_data_limit) {
+      $output .= $this->t('... and @more more results.', ['@more' => $result_count - $sample_data_limit]);
     }
     $output .= '</div>';
 
     $result['#markup'] = $output;
-    
+
     return $result;
   }
 
