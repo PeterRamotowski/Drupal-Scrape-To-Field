@@ -39,13 +39,6 @@ class WebScraperSettingsForm extends ConfigFormBase
       '#title' => $this->t('General Settings'),
     ];
 
-    $form['general']['user_agent'] = [
-      '#type' => 'textfield',
-      '#title' => $this->t('User Agent'),
-      '#default_value' => $config->get('user_agent') ?: 'Drupal Web Scraper 1.0',
-      '#description' => $this->t('User agent string to use for HTTP requests.'),
-    ];
-
     $form['general']['timeout'] = [
       '#type' => 'number',
       '#title' => $this->t('Request Timeout (seconds)'),
@@ -101,7 +94,6 @@ class WebScraperSettingsForm extends ConfigFormBase
   public function submitForm(array &$form, FormStateInterface $form_state)
   {
     $this->config('scrape_to_field.settings')
-      ->set('user_agent', $form_state->getValue('user_agent'))
       ->set('timeout', $form_state->getValue('timeout'))
       ->set('verify_ssl', $form_state->getValue('verify_ssl'))
       ->set('enable_cron', $form_state->getValue('enable_cron'))
