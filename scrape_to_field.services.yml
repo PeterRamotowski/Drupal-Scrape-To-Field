@@ -11,6 +11,9 @@ services:
     class: Drupal\scrape_to_field\Service\ScraperActivityLogger
     arguments: ['@logger.channel.scrape_to_field', '@current_user']
 
+  scrape_to_field.user_agent:
+    class: Drupal\scrape_to_field\Service\UserAgentService
+
   logger.channel.scrape_to_field:
     parent: logger.channel_base
     arguments: ['scrape_to_field']

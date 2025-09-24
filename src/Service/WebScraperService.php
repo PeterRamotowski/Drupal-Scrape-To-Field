@@ -31,13 +31,24 @@ class WebScraperService
   protected ConfigFactoryInterface $configFactory;
 
   /**
+   * The user agent service.
+   */
+  protected UserAgentService $userAgentService;
+
+  /**
+   * The scraper activity logger.
+   */
+  protected ScraperActivityLogger $scraperLogger;
+
+  /**
    * Constructs a WebScraperService object.
    */
-  public function __construct(ClientInterface $http_client, LoggerChannelInterface $logger, ConfigFactoryInterface $config_factory)
+  public function __construct(ClientInterface $http_client, ConfigFactoryInterface $config_factory, UserAgentService $user_agent_service, ScraperActivityLogger $scraper_logger)
   {
     $this->httpClient = $http_client;
-    $this->logger = $logger;
     $this->configFactory = $config_factory;
+    $this->userAgentService = $user_agent_service;
+    $this->scraperLogger = $scraper_logger;
   }
 
   /**
@@ -82,7 +93,7 @@ class WebScraperService
     try {
       // Get global scraper settings.
       $config = $this->configFactory->get('scrape_to_field.settings');
-      $user_agent = $config->get('user_agent') ?: 'Drupal Web Scraper 1.0';
+      $user_agent = $this->userAgentService->getRandomUserAgent();
       $timeout = $config->get('timeout') ?: 30;
 
       // Make HTTP request.
