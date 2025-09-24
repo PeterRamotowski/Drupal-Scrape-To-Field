@@ -29,16 +29,16 @@ class NodeScraperConfigForm extends FormBase
   /**
    * The scraper activity logger.
    */
-  protected ScraperActivityLogger $activityLogger;
+  protected ScraperActivityLogger $scraperLogger;
 
   /**
    * Constructs a NodeScraperConfigForm object.
    */
-  public function __construct(EntityTypeManagerInterface $entity_type_manager, WebScraperService $scraper_service, ScraperActivityLogger $activity_logger)
+  public function __construct(EntityTypeManagerInterface $entity_type_manager, WebScraperService $scraper_service, ScraperActivityLogger $scraper_logger)
   {
     $this->entityTypeManager = $entity_type_manager;
     $this->scraperService = $scraper_service;
-    $this->activityLogger = $activity_logger;
+    $this->scraperLogger = $scraper_logger;
   }
 
   /**
@@ -412,7 +412,7 @@ class NodeScraperConfigForm extends FormBase
     // Log the test activity
     if ($node) {
       $test_details = $success ? "Found {$result_count} results" : "Configuration test failed";
-      $this->activityLogger->logConfigurationTest($node, $success ? 'success' : 'failed', $test_details);
+      $this->scraperLogger->logConfigurationTest($node, $success ? 'success' : 'failed', $test_details);
     }
 
     if (!$success) {
@@ -537,10 +537,9 @@ class NodeScraperConfigForm extends FormBase
       // Clear all scraper configuration if scraping is disabled.
       $node->set('field_scraper_config', '');
       $node->save();
-      
-      // Log the configuration change
-      $this->activityLogger->logConfigurationChange($node, $old_config, []);
-      
+
+      $this->scraperLogger->logConfigurationChange($node);
+
       return;
     }
 
@@ -570,8 +569,7 @@ class NodeScraperConfigForm extends FormBase
     $node->set('field_scraper_config', json_encode($scraper_config));
     $node->save();
 
-    // Log the configuration change
-    $this->activityLogger->logConfigurationChange($node, $old_config, $scraper_config);
+    $this->scraperLogger->logConfigurationChange($node);
 
     // Redirect back to the node.
     $form_state->setRedirect('entity.node.canonical', ['node' => $node->id()]);

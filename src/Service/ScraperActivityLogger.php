@@ -40,23 +40,11 @@ class ScraperActivityLogger {
   /**
    * Log scraper configuration changes.
    */
-  public function logConfigurationChange(NodeInterface $node, array $old_config, array $new_config): void {
+  public function logConfigurationChange(NodeInterface $node): void {
     $this->logger->info('Scraper configuration changed for node @nid (@title) by user @uid', [
       '@nid' => $node->id() ?? 'unsaved',
       '@title' => $node->getTitle() ?? 'Untitled',
       '@uid' => $this->currentUser->id(),
-    ]);
-  }
-
-  /**
-   * Log manual scraping triggers.
-   */
-  public function logManualScrape(NodeInterface $node, int $jobs_queued): void {
-    $this->logger->info('Manual scrape triggered for node @nid (@title) by user @uid - @count jobs queued', [
-      '@nid' => $node->id() ?? 'unsaved',
-      '@title' => $node->getTitle() ?? 'Untitled',
-      '@uid' => $this->currentUser->id(),
-      '@count' => $jobs_queued,
     ]);
   }
 
@@ -73,26 +61,87 @@ class ScraperActivityLogger {
   }
 
   /**
-   * Log scraping job completion.
+   * Log invalid URL errors.
    */
-  public function logScrapingJobComplete(NodeInterface $node, string $status, int $items_processed, string $details = ''): void {
-    $this->logger->info('Scraping job completed for node @nid (@title): @status (@count items processed). @details', [
-      '@nid' => $node->id() ?? 'unsaved',
-      '@title' => $node->getTitle() ?? 'Untitled',
-      '@status' => $status,
-      '@count' => $items_processed,
-      '@details' => $details ?: 'No additional details',
+  public function logInvalidUrl(string $url): void {
+    $this->logger->error('Invalid URL provided to scrapeData: @url', [
+      '@url' => $url ?: 'empty',
     ]);
   }
 
   /**
-   * Log scraping errors.
+   * Log empty selector errors.
    */
-  public function logScrapingError(NodeInterface $node, string $error_message, array $context = []): void {
-    $this->logger->error('Scraping error for node @nid (@title): @error', [
-      '@nid' => $node->id() ?? 'unsaved',
-      '@title' => $node->getTitle() ?? 'Untitled',
-      '@error' => $error_message,
+  public function logEmptySelector(string $url): void {
+    $this->logger->error('Empty selector provided to scrapeData for URL: @url', [
+      '@url' => $url ?: 'empty',
+    ]);
+  }
+
+  /**
+   * Log invalid selector type errors.
+   */
+  public function logInvalidSelectorType(string $selector_type, string $url): void {
+    $this->logger->error('Invalid selector type "@type" provided to scrapeData for URL: @url', [
+      '@type' => $selector_type ?: 'empty',
+      '@url' => $url ?: 'empty',
+    ]);
+  }
+
+  /**
+   * Log successful scraping results.
+   */
+  public function logScrapingSuccess(string $url, int $count): void {
+    $this->logger->info('Successfully scraped @count items from @url', [
+      '@count' => $count,
+      '@url' => $url ?: 'empty',
+    ]);
+  }
+
+  /**
+   * Log HTTP request failures during scraping.
+   */
+  public function logRequestFailure(string $url, ?string $error_message = null): void {
+    $this->logger->error('Failed to scrape @url: @error', [
+      '@url' => $url ?: 'empty',
+      '@error' => $error_message ?: 'Unknown request error',
+    ]);
+  }
+
+  /**
+   * Log unexpected errors during scraping.
+   */
+  public function logUnexpectedError(string $url, ?string $error_message = null): void {
+    $this->logger->error('Unexpected error while scraping @url: @error', [
+      '@url' => $url ?: 'empty',
+      '@error' => $error_message ?: 'Unknown error',
+    ]);
+  }
+
+  /**
+   * Log when a node is not found for scraping.
+   */
+  public function logNodeNotFound(int $node_id): void {
+    $this->logger->error('Node @nid not found for scraping', [
+      '@nid' => $node_id,
+    ]);
+  }
+
+  /**
+   * Log when a node is successfully updated with scraped data.
+   */
+  public function logNodeUpdated(int $node_id): void {
+    $this->logger->info('Updated node @nid with scraped data', [
+      '@nid' => $node_id,
+    ]);
+  }
+
+  /**
+   * Log queue activity for scraping jobs.
+   */
+  public function logQueueActivity(int $queued_count): void {
+    $this->logger->info('Queued @count scraping jobs', [
+      '@count' => $queued_count,
     ]);
   }
 

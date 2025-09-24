@@ -49,11 +49,13 @@ class Hooks {
       return;
     }
 
-    /** @var \Drupal\scrape_to_field\Service\ScraperManager $scraper_manager */
-    $scraper_manager = \Drupal::service('scrape_to_field.manager');
-    $queued = $scraper_manager->queueScrapingJobsWithFrequency();
+    /** @var \Drupal\scrape_to_field\Service\QueueManager $queueManager */
+    $queueManager = \Drupal::service('scrape_to_field.queue');
+    $queued = $queueManager->queueScrapingJobsWithFrequency();
 
-    \Drupal::logger('scrape_to_field')->info('Cron queued @count scraping jobs', ['@count' => $queued]);
+    /** @var \Drupal\scrape_to_field\Service\ScraperActivityLogger $scraperLogger */
+    $scraperLogger = \Drupal::service('scrape_to_field.activity_logger');
+    $scraperLogger->logQueueActivity($queued);
   }
 
   /**

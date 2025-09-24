@@ -4,7 +4,7 @@ namespace Drupal\scrape_to_field\Service;
 
 use Drupal\Component\Utility\Html;
 use Drupal\Core\Config\ConfigFactoryInterface;
-use Drupal\Core\Logger\LoggerChannelInterface;
+use Drupal\scrape_to_field\Service\ScraperActivityLogger;
 use GuzzleHttp\ClientInterface;
 use GuzzleHttp\Exception\RequestException;
 use Symfony\Component\DomCrawler\Crawler;
@@ -19,11 +19,6 @@ class WebScraperService
    * The HTTP client.
    */
   protected ClientInterface $httpClient;
-
-  /**
-   * The logger channel.
-   */
-  protected LoggerChannelInterface $logger;
 
   /**
    * The config factory.
@@ -68,25 +63,18 @@ class WebScraperService
    */
   public function scrapeData(string $url, string $selector, string $selector_type = 'css', array $options = []): ?array
   {
-    // Check if this is a test operation to avoid success logging
-    $is_test = $options['test_mode'] ?? false;
-    
-    // Input validation for defensive programming.
     if (!filter_var($url, FILTER_VALIDATE_URL)) {
-      $this->logger->error('Invalid URL provided to scrapeData: @url', ['@url' => $url]);
+      $this->scraperLogger->logInvalidUrl($url);
       return NULL;
     }
 
     if (empty(trim($selector))) {
-      $this->logger->error('Empty selector provided to scrapeData for URL: @url', ['@url' => $url]);
+      $this->scraperLogger->logEmptySelector($url);
       return NULL;
     }
 
     if (!in_array($selector_type, ['css', 'xpath'])) {
-      $this->logger->error('Invalid selector type "@type" provided to scrapeData for URL: @url', [
-        '@type' => $selector_type,
-        '@url' => $url,
-      ]);
+      $this->scraperLogger->logInvalidSelectorType($selector_type, $url);
       return NULL;
     }
 
@@ -143,24 +131,15 @@ class WebScraperService
 
       // Only log success for non-test operations
       if (!$is_test) {
-        $this->logger->info('Successfully scraped @count items from @url', [
-          '@count' => count($data),
-          '@url' => $url,
-        ]);
+        $this->scraperLogger->logScrapingSuccess($url, count($data));
       }
 
       return $data;
     } catch (RequestException $e) {
-      $this->logger->error('Failed to scrape @url: @error', [
-        '@url' => $url,
-        '@error' => $e->getMessage() ?? 'Unknown request error',
-      ]);
+      $this->scraperLogger->logRequestFailure($url, $e->getMessage());
       return NULL;
     } catch (\Exception $e) {
-      $this->logger->error('Unexpected error while scraping @url: @error', [
-        '@url' => $url,
-        '@error' => $e->getMessage() ?? 'Unknown error',
-      ]);
+      $this->scraperLogger->logUnexpectedError($url, $e->getMessage());
       return NULL;
     }
   }

@@ -1,11 +1,15 @@
 services:
   scrape_to_field.scraper:
     class: Drupal\scrape_to_field\Service\WebScraperService
-    arguments: ['@http_client', '@logger.channel.scrape_to_field', '@config.factory']
+    arguments: ['@http_client', '@config.factory', '@scrape_to_field.user_agent', '@scrape_to_field.activity_logger']
 
   scrape_to_field.manager:
-    class: Drupal\scrape_to_field\Service\ScraperManager
-    arguments: ['@entity_type.manager', '@queue', '@scrape_to_field.scraper', '@logger.channel.scrape_to_field']
+    class: Drupal\scrape_to_field\Service\ScrapeFieldManager
+    arguments: ['@entity_type.manager', '@scrape_to_field.scraper', '@scrape_to_field.activity_logger']
+
+  scrape_to_field.queue:
+    class: Drupal\scrape_to_field\Service\QueueManager
+    arguments: ['@entity_type.manager', '@queue', '@scrape_to_field.manager', '@scrape_to_field.activity_logger']
 
   scrape_to_field.activity_logger:
     class: Drupal\scrape_to_field\Service\ScraperActivityLogger
