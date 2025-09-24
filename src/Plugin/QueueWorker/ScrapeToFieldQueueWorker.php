@@ -2,36 +2,33 @@
 
 namespace Drupal\scrape_to_field\Plugin\QueueWorker;
 
-use Drupal\Core\Queue\Attribute\QueueWorker;
 use Drupal\Core\Plugin\ContainerFactoryPluginInterface;
+use Drupal\Core\Queue\Attribute\QueueWorker;
 use Drupal\Core\Queue\QueueWorkerBase;
-use Drupal\scrape_to_field\Service\ScraperManager;
-use Symfony\Component\DependencyInjection\ContainerInterface;
 use Drupal\Core\StringTranslation\TranslatableMarkup;
+use Drupal\scrape_to_field\Service\ScrapeFieldManager;
+use Symfony\Component\DependencyInjection\ContainerInterface;
 
 /**
  * Processes web scraping tasks in the background.
  */
 #[QueueWorker(
   id: "scrape_to_field_queue",
-  title: new TranslatableMarkup("Web Scraper Queue Worker"),
+  title: new TranslatableMarkup("Scrape to field queue worker"),
   cron: ["time" => 60]
 )]
-class WebScraperQueueWorker extends QueueWorkerBase implements ContainerFactoryPluginInterface
+class ScrapeToFieldQueueWorker extends QueueWorkerBase implements ContainerFactoryPluginInterface
 {
 
   /**
-   * The scraper manager service.
+   * The scrape to field manager.
    */
-  protected ScraperManager $scraperManager;
+  protected ScrapeFieldManager $scrapeFieldManager;
 
-  /**
-   * Constructs a WebScraperQueueWorker object.
-   */
-  public function __construct(array $configuration, $plugin_id, $plugin_definition, ScraperManager $scraper_manager)
+  public function __construct(array $configuration, $plugin_id, $plugin_definition, ScrapeFieldManager $scraper_manager)
   {
     parent::__construct($configuration, $plugin_id, $plugin_definition);
-    $this->scraperManager = $scraper_manager;
+    $this->scrapeFieldManager = $scraper_manager;
   }
 
   /**
@@ -57,6 +54,6 @@ class WebScraperQueueWorker extends QueueWorkerBase implements ContainerFactoryP
     }
 
     $field_name = $data['field_name'] ?? NULL;
-    $this->scraperManager->processNodeScraping($data['node_id'], $field_name);
+    $this->scrapeFieldManager->processNodeScraping($data['node_id'], $field_name);
   }
 }
