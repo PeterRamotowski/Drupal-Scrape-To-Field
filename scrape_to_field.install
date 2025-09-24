@@ -17,8 +17,8 @@ function scrape_to_field_install() {
 
   $scraper_config_field_definition = BaseFieldDefinition::create('string_long')
     ->setName('field_scraper_config')
-    ->setLabel(new TranslatableMarkup('Web Scraper Configuration'))
-    ->setDescription(new TranslatableMarkup('Internal field to store web scraper configuration data.'))
+    ->setLabel(new TranslatableMarkup('Scrape to field Configuration'))
+    ->setDescription(new TranslatableMarkup('Internal field to store scrape to field configuration data.'))
     ->setDefaultValue('')
     ->setDisplayConfigurable('form', FALSE)
     ->setDisplayConfigurable('view', FALSE);

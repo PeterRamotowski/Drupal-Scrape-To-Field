@@ -11,7 +11,7 @@ use Drupal\scrape_to_field\Service\ScraperActivityLogger;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 
 /**
- * Form for configuring web scraper settings per node.
+ * Form for configuring scrape to field settings per node.
  */
 class NodeScraperConfigForm extends FormBase
 {

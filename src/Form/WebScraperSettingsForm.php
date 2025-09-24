@@ -6,7 +6,7 @@ use Drupal\Core\Form\ConfigFormBase;
 use Drupal\Core\Form\FormStateInterface;
 
 /**
- * Configure Web Scraper settings.
+ * Configure scrape to field settings.
  */
 class WebScraperSettingsForm extends ConfigFormBase
 {

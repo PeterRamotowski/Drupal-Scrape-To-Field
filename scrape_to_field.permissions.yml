@@ -1,13 +1,13 @@
-administer web scraper:
-  title: 'Administer web scraper settings'
-  description: 'Configure global web scraper settings'
+administer scrape to field:
+  title: 'Administer scrape to field settings'
+  description: 'Configure global scrape to field settings'
   restrict access: true
 
-configure any node web scraper:
-  title: 'Configure any node web scraper'
-  description: 'Configure web scraper settings for any node'
+configure any node scrape to field:
+  title: 'Configure any node scrape to field'
+  description: 'Configure scrape to field settings for any node'
   restrict access: true
 
-configure own node web scraper:
-  title: 'Configure own node web scraper'
-  description: 'Configure web scraper settings for own nodes only'
+configure own node scrape to field:
+  title: 'Configure own node scrape to field'
+  description: 'Configure scrape to field settings for own nodes only'

@@ -9,7 +9,7 @@ use Drupal\node\NodeInterface;
 use Symfony\Component\Routing\Route;
 
 /**
- * Checks access for configuring node web scraper settings.
+ * Checks access for configuring node scrape to field settings.
  */
 class NodeScraperConfigAccess implements AccessInterface {
 
@@ -28,14 +28,14 @@ class NodeScraperConfigAccess implements AccessInterface {
    */
   public function access(AccountInterface $account, Route $route, NodeInterface $node) {
     // Global admin permission allows access to any node.
-    if ($account->hasPermission('configure any node web scraper')) {
-      return AccessResult::allowedIfHasPermission($account, 'configure any node web scraper')
+    if ($account->hasPermission('configure any node scrape to field')) {
+      return AccessResult::allowedIfHasPermission($account, 'configure any node scrape to field')
         ->addCacheContexts(['user.permissions'])
         ->addCacheTags(['node:' . $node->id()]);
     }
 
     // Check if user can configure own nodes and owns this node.
-    if ($account->hasPermission('configure own node web scraper')) {
+    if ($account->hasPermission('configure own node scrape to field')) {
       $is_owner = $node->getOwnerId() == $account->id();
       return AccessResult::allowedIf($is_owner)
         ->addCacheContexts(['user.permissions', 'user'])
