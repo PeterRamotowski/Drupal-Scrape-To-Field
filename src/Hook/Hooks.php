@@ -5,7 +5,6 @@ namespace Drupal\scrape_to_field\Hook;
 use Drupal\Core\Entity\EntityInterface;
 use Drupal\Core\Entity\EntityTypeInterface;
 use Drupal\Core\Field\FieldStorageDefinitionInterface;
-use Drupal\Core\Form\FormStateInterface;
 use Drupal\Core\Hook\Attribute\Hook;
 use Drupal\Core\Url;
 
@@ -76,59 +75,6 @@ class Hooks {
     }
 
     return $operations;
-  }
-
-  /**
-   * Implements hook_form_alter().
-   */
-  #[Hook('form_alter')]
-  public function formAlter(array &$form, FormStateInterface $formState, string $form_id): void {
-    if ($form_id === 'node_form') {
-      /** @var \Drupal\Core\Entity\ContentEntityFormInterface $form_object */
-      $form_object = $formState->getFormObject();
-
-      /** @var \Drupal\Core\Entity\ContentEntityInterface $entity */
-      $entity = $form_object->getEntity();
-
-      if (!$entity->hasField('field_scraper_config')) {
-        return;
-      }
-
-      $form['actions']['submit']['#submit'][] = [$this, 'nodeFormSubmit'];
-    }
-  }
-
-  /**
-   * Submit handler for node forms with scraper configuration.
-   */
-  public function nodeFormSubmit(array &$form, FormStateInterface $formState): void {
-    /** @var \Drupal\Core\Entity\ContentEntityFormInterface $form_object */
-    $form_object = $formState->getFormObject();
-
-    /** @var \Drupal\Core\Entity\ContentEntityInterface $entity */
-    $entity = $form_object->getEntity();
-
-    // Process scraper configurations and save them to the configuration field.
-    $scraper_configs = [];
-    $values = $formState->getValues();
-
-    foreach ($values as $field_name => $field_value) {
-      // Skip non-array values (e.g., TranslatableMarkup objects).
-      if (!is_array($field_value) || !isset($field_value[0]) || !is_array($field_value[0])) {
-        continue;
-      }
-
-      if (isset($field_value[0]['scraper_config']) && $field_value[0]['scraper_config']['enabled']) {
-        $config = $field_value[0]['scraper_config'];
-        // Remove form elements.
-        unset($config['validate'], $config['validation_result']);
-        $scraper_configs[$field_name] = $config;
-      }
-    }
-
-    if (!empty($scraper_configs) && $entity->hasField('field_scraper_config')) {
-      $entity->set('field_scraper_config', json_encode($scraper_configs));
-    }
   }
 
 }
