@@ -2,6 +2,7 @@
 
 namespace Drupal\Tests\scrape_to_field\Unit;
 
+use Psr\Http\Message\RequestInterface;
 use Drupal\scrape_to_field\Service\WebScraperService;
 use Drupal\scrape_to_field\Service\UserAgentService;
 use Drupal\scrape_to_field\Service\ScraperActivityLogger;
@@ -127,7 +128,7 @@ class WebScraperServiceTest extends TestCase {
       'https://example.com/test',
       'h1',
       'css',
-      ['test_mode' => true]
+      ['test_mode' => TRUE]
     );
 
     $this->assertIsArray($result);
@@ -138,7 +139,7 @@ class WebScraperServiceTest extends TestCase {
   /**
    * Tests successful XPath selector scraping.
    */
-  public function testSuccessfulXPathSelectorScraping() {
+  public function testSuccessfulXpathSelectorScraping() {
     $html = '<html><body><h1 class="title">XPath Title</h1></body></html>';
     $response = new Response(200, [], $html);
 
@@ -150,7 +151,7 @@ class WebScraperServiceTest extends TestCase {
       'https://example.com/test',
       '//h1[@class="title"]',
       'xpath',
-      ['test_mode' => true]
+      ['test_mode' => TRUE]
     );
 
     $this->assertIsArray($result);
@@ -218,7 +219,7 @@ class WebScraperServiceTest extends TestCase {
   public function testHttpRequestException() {
     $exception = new RequestException(
       'Connection timeout',
-      $this->createMock(\Psr\Http\Message\RequestInterface::class)
+      $this->createMock(RequestInterface::class)
     );
 
     $this->httpClient
@@ -254,7 +255,7 @@ class WebScraperServiceTest extends TestCase {
       'https://example.com/test',
       'h1',
       'css',
-      ['test_mode' => true]
+      ['test_mode' => TRUE]
     );
 
     $this->assertIsArray($result);
@@ -276,7 +277,7 @@ class WebScraperServiceTest extends TestCase {
       'https://example.com/test',
       'h1',
       'css',
-      ['test_mode' => true]
+      ['test_mode' => TRUE]
     );
 
     $this->assertIsArray($result);
@@ -301,7 +302,7 @@ class WebScraperServiceTest extends TestCase {
       ['search' => 'Original', 'replace' => 'Modified'],
     ];
 
-    // Override the default mock behavior for this specific test
+    // Override the default mock behavior for this specific test.
     $this->dataCleaningService = $this->createMock(DataCleaningService::class);
     $this->dataCleaningService
       ->expects($this->once())
@@ -309,7 +310,7 @@ class WebScraperServiceTest extends TestCase {
       ->with(['Original Title'], $cleaning_operations)
       ->willReturn(['Modified Title']);
 
-    // Create a new service instance for this test with the overridden mock
+    // Create a new service instance for this test with the overridden mock.
     $scraperService = new WebScraperService(
       $this->httpClient,
       $this->configFactory,
@@ -322,7 +323,7 @@ class WebScraperServiceTest extends TestCase {
       'https://example.com/test',
       'h1',
       'css',
-      ['cleaning_operations' => $cleaning_operations, 'test_mode' => true]
+      ['cleaning_operations' => $cleaning_operations, 'test_mode' => TRUE]
     );
 
     $this->assertIsArray($result);
@@ -354,7 +355,7 @@ class WebScraperServiceTest extends TestCase {
       'https://example.com/test',
       'h1',
       'css',
-      ['test_mode' => true]
+      ['test_mode' => TRUE]
     );
 
     $this->assertIsArray($result);
@@ -375,7 +376,7 @@ class WebScraperServiceTest extends TestCase {
       'https://example.com/test',
       'h1',
       'css',
-      ['test_mode' => true]
+      ['test_mode' => TRUE]
     );
 
     $this->assertIsArray($result);
@@ -397,7 +398,7 @@ class WebScraperServiceTest extends TestCase {
       'https://example.com/api/data',
       'h1',
       'css',
-      ['test_mode' => true]
+      ['test_mode' => TRUE]
     );
 
     // Should return empty array as JSON can't be parsed as HTML.

@@ -4,8 +4,6 @@ namespace Drupal\scrape_to_field\Service;
 
 use Drupal\Component\Utility\Html;
 use Drupal\Core\Config\ConfigFactoryInterface;
-use Drupal\scrape_to_field\Service\DataCleaningService;
-use Drupal\scrape_to_field\Service\ScraperActivityLogger;
 use GuzzleHttp\ClientInterface;
 use GuzzleHttp\Exception\RequestException;
 use Symfony\Component\DomCrawler\Crawler;
@@ -13,8 +11,7 @@ use Symfony\Component\DomCrawler\Crawler;
 /**
  * Web scraper service for extracting data from external websites.
  */
-class WebScraperService
-{
+class WebScraperService {
 
   /**
    * The HTTP client.
@@ -44,8 +41,7 @@ class WebScraperService
   /**
    * Constructs a WebScraperService object.
    */
-  public function __construct(ClientInterface $http_client, ConfigFactoryInterface $config_factory, UserAgentService $user_agent_service, ScraperActivityLogger $scraper_logger, DataCleaningService $data_cleaning_service)
-  {
+  public function __construct(ClientInterface $http_client, ConfigFactoryInterface $config_factory, UserAgentService $user_agent_service, ScraperActivityLogger $scraper_logger, DataCleaningService $data_cleaning_service) {
     $this->httpClient = $http_client;
     $this->configFactory = $config_factory;
     $this->userAgentService = $user_agent_service;
@@ -68,8 +64,7 @@ class WebScraperService
    * @return array|null
    *   Scraped data or NULL on failure.
    */
-  public function scrapeData(string $url, string $selector, string $selector_type = 'css', array $options = []): ?array
-  {
+  public function scrapeData(string $url, string $selector, string $selector_type = 'css', array $options = []): ?array {
     if (!filter_var($url, FILTER_VALIDATE_URL)) {
       $this->scraperLogger->logInvalidUrl($url);
       return NULL;
@@ -109,7 +104,8 @@ class WebScraperService
       $data = [];
       if ($selector_type === 'xpath') {
         $nodes = $crawler->filterXPath($selector);
-      } else {
+      }
+      else {
         $nodes = $crawler->filter($selector);
       }
 
@@ -136,21 +132,23 @@ class WebScraperService
         }
       });
 
-      // Apply cleaning operations
+      // Apply cleaning operations.
       if (!empty($options['cleaning_operations'])) {
         $data = $this->dataCleaningService->applyCleaningOperations($data, $options['cleaning_operations']);
       }
 
-      $is_test = $options['test_mode'] ?? false;
+      $is_test = $options['test_mode'] ?? FALSE;
       if (!$is_test) {
         $this->scraperLogger->logScrapingSuccess($url, count($data));
       }
 
       return $data;
-    } catch (RequestException $e) {
+    }
+    catch (RequestException $e) {
       $this->scraperLogger->logRequestFailure($url, $e->getMessage());
       return NULL;
-    } catch (\Exception $e) {
+    }
+    catch (\Exception $e) {
       $this->scraperLogger->logUnexpectedError($url, $e->getMessage());
       return NULL;
     }
@@ -169,8 +167,7 @@ class WebScraperService
    * @return array
    *   Validation result with 'valid' boolean and 'message'.
    */
-  public function validateScrapeConfig(string $url, string $selector, string $selector_type = 'css'): array
-  {
+  public function validateScrapeConfig(string $url, string $selector, string $selector_type = 'css'): array {
     // Validate URL.
     if (!filter_var($url, FILTER_VALIDATE_URL)) {
       return [
@@ -190,8 +187,8 @@ class WebScraperService
     // Try a test scrape with limited timeout.
     try {
       $test_data = $this->scrapeData($url, $selector, $selector_type, [
-          'timeout' => 10,
-          'test_mode' => true,
+        'timeout' => 10,
+        'test_mode' => TRUE,
       ]);
       if ($test_data === NULL) {
         return [
@@ -203,11 +200,13 @@ class WebScraperService
         'valid' => TRUE,
         'message' => 'Configuration is valid',
       ];
-    } catch (\Exception $e) {
+    }
+    catch (\Exception $e) {
       return [
         'valid' => FALSE,
         'message' => 'Test scraping failed: ' . Html::escape($e->getMessage() ?? 'Unknown error'),
       ];
     }
   }
+
 }

@@ -5,8 +5,7 @@ namespace Drupal\scrape_to_field\Service;
 /**
  * Service for cleaning and transforming scraped data.
  */
-class DataCleaningService
-{
+class DataCleaningService {
 
   /**
    * Applies cleaning operations to scraped data.
@@ -19,14 +18,13 @@ class DataCleaningService
    * @return array
    *   The cleaned data array.
    */
-  public function applyCleaningOperations(array $data, array $cleaning_operations): array
-  {
+  public function applyCleaningOperations(array $data, array $cleaning_operations): array {
     $cleaned_data = [];
 
     foreach ($data as $item) {
       $cleaned_item = (string) $item;
 
-      // Apply each cleaning operation in order
+      // Apply each cleaning operation in order.
       foreach ($cleaning_operations as $operation) {
         $search = $operation['search'] ?? '';
         $replace = $operation['replace'] ?? '';
@@ -51,8 +49,7 @@ class DataCleaningService
    * @return array
    *   Array of cleaning operations with 'search' and 'replace' keys.
    */
-  public function parseCleaningOperations(string $operations_text): array
-  {
+  public function parseCleaningOperations(string $operations_text): array {
     $lines = explode("\n", $operations_text);
     $cleaning_operations = [];
 
@@ -61,7 +58,7 @@ class DataCleaningService
       if (!empty($line)) {
         $parts = explode('|', $line, 2);
         $search = $parts[0] ?? '';
-        $replace = isset($parts[1]) ? $parts[1] : '';
+        $replace = $parts[1] ?? '';
 
         if (!empty($search)) {
           $cleaning_operations[] = [

@@ -5,11 +5,11 @@ services:
 
   scrape_to_field.manager:
     class: Drupal\scrape_to_field\Service\ScrapeFieldManager
-    arguments: ['@entity_type.manager', '@scrape_to_field.scraper', '@scrape_to_field.activity_logger', '@scrape_to_field.content_sanitization']
+    arguments: ['@entity_type.manager', '@scrape_to_field.scraper', '@scrape_to_field.activity_logger', '@scrape_to_field.content_sanitization', '@state']
 
   scrape_to_field.queue:
     class: Drupal\scrape_to_field\Service\QueueManager
-    arguments: ['@entity_type.manager', '@queue', '@scrape_to_field.manager', '@scrape_to_field.activity_logger']
+    arguments: ['@entity_type.manager', '@queue', '@scrape_to_field.manager', '@scrape_to_field.activity_logger', '@config.factory', '@state']
 
   scrape_to_field.content_sanitization:
     class: Drupal\scrape_to_field\Service\ContentSanitizationService

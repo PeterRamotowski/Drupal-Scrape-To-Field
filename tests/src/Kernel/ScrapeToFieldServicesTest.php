@@ -7,8 +7,7 @@ use Drupal\KernelTests\KernelTestBase;
 /**
  * Tests the scrape_to_field services in a kernel environment.
  */
-class ScrapeToFieldServicesTest extends KernelTestBase
-{
+class ScrapeToFieldServicesTest extends KernelTestBase {
 
   /**
    * {@inheritdoc}
@@ -24,8 +23,7 @@ class ScrapeToFieldServicesTest extends KernelTestBase
   /**
    * Tests that all scrape_to_field services can be instantiated.
    */
-  public function testServicesCanBeInstantiated()
-  {
+  public function testServicesCanBeInstantiated() {
     $scraper = $this->container->get('scrape_to_field.scraper');
     $this->assertInstanceOf('Drupal\scrape_to_field\Service\WebScraperService', $scraper);
 
@@ -48,8 +46,7 @@ class ScrapeToFieldServicesTest extends KernelTestBase
   /**
    * Tests the UserAgentService.
    */
-  public function testUserAgentService()
-  {
+  public function testUserAgentService() {
     $user_agent_service = $this->container->get('scrape_to_field.user_agent');
 
     $user_agent = $user_agent_service->getRandomUserAgent();
@@ -68,8 +65,7 @@ class ScrapeToFieldServicesTest extends KernelTestBase
   /**
    * Tests the WebScraperService with invalid inputs.
    */
-  public function testWebScraperServiceValidation()
-  {
+  public function testWebScraperServiceValidation() {
     $scraper_service = $this->container->get('scrape_to_field.scraper');
 
     // Test with invalid URL.
@@ -88,9 +84,7 @@ class ScrapeToFieldServicesTest extends KernelTestBase
   /**
    * Tests the queue functionality.
    */
-  public function testQueueFunctionality()
-  {
-    $queue_manager = $this->container->get('scrape_to_field.queue');
+  public function testQueueFunctionality() {
     $queue = $this->container->get('queue')->get('scrape_to_field_queue');
 
     $queue->deleteQueue();
@@ -107,19 +101,21 @@ class ScrapeToFieldServicesTest extends KernelTestBase
     // Test queue item structure.
     $item = $queue->claimItem();
     $this->assertNotFalse($item);
-    $this->assertIsArray($item->data);
-    $this->assertArrayHasKey('node_id', $item->data);
-    $this->assertArrayHasKey('field_name', $item->data);
-    $this->assertArrayHasKey('timestamp', $item->data);
 
-    $queue->releaseItem($item);
+    if ($item && is_object($item) && property_exists($item, 'data')) {
+      $this->assertIsArray($item->data);
+      $this->assertArrayHasKey('node_id', $item->data);
+      $this->assertArrayHasKey('field_name', $item->data);
+      $this->assertArrayHasKey('timestamp', $item->data);
+
+      $queue->releaseItem($item);
+    }
   }
 
   /**
    * Tests the scraper activity logger.
    */
-  public function testScraperActivityLogger()
-  {
+  public function testScraperActivityLogger() {
     /** @var \Drupal\scrape_to_field\Service\ScraperActivityLogger $activity_logger */
     $activity_logger = $this->container->get('scrape_to_field.activity_logger');
 
@@ -136,8 +132,7 @@ class ScrapeToFieldServicesTest extends KernelTestBase
   /**
    * Tests configuration integration.
    */
-  public function testConfigurationIntegration()
-  {
+  public function testConfigurationIntegration() {
     $config = $this->config('scrape_to_field.settings');
 
     $timeout = $config->get('timeout');
@@ -152,8 +147,7 @@ class ScrapeToFieldServicesTest extends KernelTestBase
   /**
    * Tests queue worker plugin.
    */
-  public function testQueueWorkerPlugin()
-  {
+  public function testQueueWorkerPlugin() {
     $plugin_manager = $this->container->get('plugin.manager.queue_worker');
 
     $plugins = $plugin_manager->getDefinitions();
@@ -163,4 +157,5 @@ class ScrapeToFieldServicesTest extends KernelTestBase
     $queue_worker = $plugin_manager->createInstance('scrape_to_field_queue');
     $this->assertInstanceOf('Drupal\scrape_to_field\Plugin\QueueWorker\ScrapeToFieldQueueWorker', $queue_worker);
   }
+
 }

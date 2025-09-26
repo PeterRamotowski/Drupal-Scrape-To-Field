@@ -17,16 +17,14 @@ use Symfony\Component\DependencyInjection\ContainerInterface;
   title: new TranslatableMarkup("Scrape to field queue worker"),
   cron: ["time" => 60]
 )]
-class ScrapeToFieldQueueWorker extends QueueWorkerBase implements ContainerFactoryPluginInterface
-{
+class ScrapeToFieldQueueWorker extends QueueWorkerBase implements ContainerFactoryPluginInterface {
 
   /**
    * The scrape to field manager.
    */
   protected ScrapeFieldManager $scrapeFieldManager;
 
-  public function __construct(array $configuration, $plugin_id, $plugin_definition, ScrapeFieldManager $scraper_manager)
-  {
+  public function __construct(array $configuration, $plugin_id, $plugin_definition, ScrapeFieldManager $scraper_manager) {
     parent::__construct($configuration, $plugin_id, $plugin_definition);
     $this->scrapeFieldManager = $scraper_manager;
   }
@@ -34,8 +32,7 @@ class ScrapeToFieldQueueWorker extends QueueWorkerBase implements ContainerFacto
   /**
    * {@inheritdoc}
    */
-  public static function create(ContainerInterface $container, array $configuration, $plugin_id, $plugin_definition)
-  {
+  public static function create(ContainerInterface $container, array $configuration, $plugin_id, $plugin_definition) {
     return new static(
       $configuration,
       $plugin_id,
@@ -47,8 +44,7 @@ class ScrapeToFieldQueueWorker extends QueueWorkerBase implements ContainerFacto
   /**
    * {@inheritdoc}
    */
-  public function processItem($data)
-  {
+  public function processItem($data) {
     if (!isset($data['node_id'])) {
       return;
     }
@@ -56,4 +52,5 @@ class ScrapeToFieldQueueWorker extends QueueWorkerBase implements ContainerFacto
     $field_name = $data['field_name'] ?? NULL;
     $this->scrapeFieldManager->processNodeScraping($data['node_id'], $field_name);
   }
+
 }

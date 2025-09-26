@@ -39,7 +39,7 @@ function scrape_to_field_uninstall() {
     ->condition('field_scraper_config', NULL, 'IS NOT NULL')
     ->accessCheck(TRUE);
   $node_ids = $query->execute();
-  
+
   if (is_array($node_ids) && !empty($node_ids)) {
     /** @var \Drupal\node\Entity\Node[] $nodes */
     $nodes = \Drupal::entityTypeManager()->getStorage('node')->loadMultiple($node_ids);

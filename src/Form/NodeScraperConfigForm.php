@@ -17,8 +17,7 @@ use Symfony\Component\DependencyInjection\ContainerInterface;
 /**
  * Form for configuring scrape to field settings per node.
  */
-class NodeScraperConfigForm extends FormBase
-{
+class NodeScraperConfigForm extends FormBase {
 
   /**
    * The entity type manager.
@@ -43,8 +42,7 @@ class NodeScraperConfigForm extends FormBase
   /**
    * Constructs a NodeScraperConfigForm object.
    */
-  public function __construct(EntityTypeManagerInterface $entity_type_manager, WebScraperService $scraper_service, ScraperActivityLogger $scraper_logger, DataCleaningService $data_cleaning_service)
-  {
+  public function __construct(EntityTypeManagerInterface $entity_type_manager, WebScraperService $scraper_service, ScraperActivityLogger $scraper_logger, DataCleaningService $data_cleaning_service) {
     $this->entityTypeManager = $entity_type_manager;
     $this->scraperService = $scraper_service;
     $this->scraperLogger = $scraper_logger;
@@ -54,8 +52,7 @@ class NodeScraperConfigForm extends FormBase
   /**
    * {@inheritdoc}
    */
-  public static function create(ContainerInterface $container)
-  {
+  public static function create(ContainerInterface $container) {
     return new static(
       $container->get('entity_type.manager'),
       $container->get('scrape_to_field.scraper'),
@@ -67,16 +64,14 @@ class NodeScraperConfigForm extends FormBase
   /**
    * {@inheritdoc}
    */
-  public function getFormId()
-  {
+  public function getFormId() {
     return 'node_scraper_config_form';
   }
 
   /**
    * {@inheritdoc}
    */
-  public function buildForm(array $form, FormStateInterface $form_state, NodeInterface $node = NULL)
-  {
+  public function buildForm(array $form, FormStateInterface $form_state, ?NodeInterface $node = NULL) {
     if (!$node) {
       return $form;
     }
@@ -158,8 +153,7 @@ class NodeScraperConfigForm extends FormBase
   /**
    * Builds configuration form elements for a specific field.
    */
-  protected function buildFieldConfigurationForm(array &$form, string $field_name, $field_definition, array $field_config, FormStateInterface $form_state): void
-  {
+  protected function buildFieldConfigurationForm(array &$form, string $field_name, $field_definition, array $field_config, FormStateInterface $form_state): void {
     $form['enabled'] = [
       '#type' => 'checkbox',
       '#title' => $this->t('Enable scraping for this field'),
@@ -290,7 +284,7 @@ class NodeScraperConfigForm extends FormBase
       '#states' => $cleaning_states_visible,
     ];
 
-    // Convert cleaning_operations array back to textarea format for display
+    // Convert cleaning_operations array back to textarea format for display.
     $operations_text = '';
     if (!empty($field_config['cleaning_operations'])) {
       foreach ($field_config['cleaning_operations'] as $operation) {
@@ -407,15 +401,14 @@ class NodeScraperConfigForm extends FormBase
   /**
    * AJAX callback for testing field configuration.
    */
-  public function ajaxTestConfiguration(array &$form, FormStateInterface $form_state)
-  {
+  public function ajaxTestConfiguration(array &$form, FormStateInterface $form_state) {
     $triggering_element = $form_state->getTriggeringElement();
     $field_name = $this->extractFieldNameFromElement($triggering_element);
 
     $result = [
       '#type' => 'container',
       '#attributes' => [
-        'id' => 'test-result-' . ($field_name ?? 'unknown')
+        'id' => 'test-result-' . ($field_name ?? 'unknown'),
       ],
     ];
 
@@ -449,7 +442,7 @@ class NodeScraperConfigForm extends FormBase
     $success = $test_result !== NULL;
     $result_count = $success ? count($test_result) : 0;
 
-    // Log the test activity
+    // Log the test activity.
     if ($node) {
       $test_details = $success ? "Found {$result_count} results" : "Configuration test failed";
       $this->scraperLogger->logConfigurationTest($node, $success ? 'success' : 'failed', $test_details);
@@ -484,8 +477,7 @@ class NodeScraperConfigForm extends FormBase
   /**
    * {@inheritdoc}
    */
-  public function validateForm(array &$form, FormStateInterface $form_state)
-  {
+  public function validateForm(array &$form, FormStateInterface $form_state) {
     $node = $form_state->get('node');
     if (!$node) {
       $form_state->setError($form, $this->t('Node not found.'));
@@ -565,8 +557,7 @@ class NodeScraperConfigForm extends FormBase
   /**
    * {@inheritdoc}
    */
-  public function submitForm(array &$form, FormStateInterface $form_state)
-  {
+  public function submitForm(array &$form, FormStateInterface $form_state) {
     $node = $form_state->get('node');
     $global_settings = $form_state->getValue('global_settings');
 
@@ -600,7 +591,7 @@ class NodeScraperConfigForm extends FormBase
       }
     }
 
-    $node_scraper_config = new NodeScraperConfigDto(true, $scraper_field_configs);
+    $node_scraper_config = new NodeScraperConfigDto(TRUE, $scraper_field_configs);
     $node->set('field_scraper_config', $node_scraper_config->toJson());
     $node->save();
 
@@ -612,12 +603,11 @@ class NodeScraperConfigForm extends FormBase
   /**
    * Gets scraper-enabled fields for a node type.
    */
-  protected function getScraperEnabledFields(NodeInterface $node): array
-  {
+  protected function getScraperEnabledFields(NodeInterface $node): array {
     $fields = [];
     $field_definitions = $node->getFieldDefinitions();
 
-    // Supported field types for scraping
+    // Supported field types for scraping.
     $supported_field_types = [
       'string',
       'string_long',
@@ -646,8 +636,7 @@ class NodeScraperConfigForm extends FormBase
   /**
    * Gets current scraper configuration for a node.
    */
-  protected function getNodeScraperConfig(NodeInterface $node): NodeScraperConfigDto
-  {
+  protected function getNodeScraperConfig(NodeInterface $node): NodeScraperConfigDto {
     if (!$node->hasField('field_scraper_config')) {
       return NodeScraperConfigDto::disabled();
     }
@@ -659,15 +648,14 @@ class NodeScraperConfigForm extends FormBase
 
     $config_value = $config_field->first()->getValue();
     $json = $config_value['value'] ?? '[]';
-    
+
     return NodeScraperConfigDto::fromJson($json);
   }
 
   /**
    * Gets available text formats.
    */
-  protected function getAvailableTextFormats(): array
-  {
+  protected function getAvailableTextFormats(): array {
     $formats = [];
     $text_formats = $this->entityTypeManager->getStorage('filter_format')->loadMultiple();
 
@@ -681,21 +669,20 @@ class NodeScraperConfigForm extends FormBase
   /**
    * Extracts field name from form element.
    */
-  protected function extractFieldNameFromElement(array $element): ?string
-  {
+  protected function extractFieldNameFromElement(array $element): ?string {
     // Try to extract from button name attribute (for test buttons)
     $button_name = $element['#name'] ?? '';
     if (preg_match('/^test_field_(.+)$/', $button_name, $matches)) {
       return $matches[1];
     }
 
-    // Try to get field name from parents
+    // Try to get field name from parents.
     $parents = $element['#parents'] ?? [];
     if (count($parents) >= 1 && str_starts_with($parents[0], 'field_')) {
       return substr($parents[0], 6);
     }
 
-    // Try to get field name from array_parents
+    // Try to get field name from array_parents.
     $array_parents = $element['#array_parents'] ?? [];
     foreach ($array_parents as $parent) {
       if (is_string($parent) && str_starts_with($parent, 'field_')) {
@@ -705,4 +692,5 @@ class NodeScraperConfigForm extends FormBase
 
     return NULL;
   }
+
 }

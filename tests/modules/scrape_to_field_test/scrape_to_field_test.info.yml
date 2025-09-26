@@ -4,5 +4,5 @@ description: 'Provides test fixtures and data for scrape_to_field module tests'
 package: Testing
 core_version_requirement: ^11
 dependencies:
-  - scrape_to_field
+  - scrape_to_field:scrape_to_field
 hidden: true

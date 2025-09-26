@@ -8,8 +8,7 @@ use PHPUnit\Framework\TestCase;
 /**
  * Tests the DataCleaningService class.
  */
-class DataCleaningServiceTest extends TestCase
-{
+class DataCleaningServiceTest extends TestCase {
 
   /**
    * The data cleaning service under test.
@@ -21,8 +20,7 @@ class DataCleaningServiceTest extends TestCase
   /**
    * {@inheritdoc}
    */
-  protected function setUp(): void
-  {
+  protected function setUp(): void {
     parent::setUp();
     $this->dataCleaningService = new DataCleaningService();
   }
@@ -30,8 +28,7 @@ class DataCleaningServiceTest extends TestCase
   /**
    * Tests basic cleaning operations.
    */
-  public function testBasicCleaningOperations()
-  {
+  public function testBasicCleaningOperations() {
     $data = ['Hello World!', 'Test content'];
     $cleaning_operations = [
       ['search' => 'Hello', 'replace' => 'Hi'],
@@ -48,8 +45,7 @@ class DataCleaningServiceTest extends TestCase
   /**
    * Tests cleaning operations with empty search.
    */
-  public function testCleaningOperationsWithEmptySearch()
-  {
+  public function testCleaningOperationsWithEmptySearch() {
     $data = ['Original content'];
     $cleaning_operations = [
       ['search' => '', 'replace' => 'replacement'],
@@ -64,8 +60,7 @@ class DataCleaningServiceTest extends TestCase
   /**
    * Tests cleaning operations with missing replace key.
    */
-  public function testCleaningOperationsWithMissingReplace()
-  {
+  public function testCleaningOperationsWithMissingReplace() {
     $data = ['Remove this!'];
     $cleaning_operations = [
       ['search' => ' this!'],
@@ -79,8 +74,7 @@ class DataCleaningServiceTest extends TestCase
   /**
    * Tests parsing cleaning operations from text.
    */
-  public function testParseCleaningOperations()
-  {
+  public function testParseCleaningOperations() {
     $operations_text = "Hello|Hi\nWorld|Universe\n!|\nempty line|replacement\nspaces   |trimmed";
 
     $result = $this->dataCleaningService->parseCleaningOperations($operations_text);
@@ -99,8 +93,7 @@ class DataCleaningServiceTest extends TestCase
   /**
    * Tests parsing empty operations text.
    */
-  public function testParseEmptyOperationsText()
-  {
+  public function testParseEmptyOperationsText() {
     $operations_text = '';
 
     $result = $this->dataCleaningService->parseCleaningOperations($operations_text);
@@ -112,8 +105,7 @@ class DataCleaningServiceTest extends TestCase
   /**
    * Tests multiple cleaning operations in sequence.
    */
-  public function testMultipleCleaningOperations()
-  {
+  public function testMultipleCleaningOperations() {
     $data = ['<p>Hello World!</p>'];
     $cleaning_operations = [
       ['search' => '<p>', 'replace' => ''],
@@ -130,8 +122,7 @@ class DataCleaningServiceTest extends TestCase
   /**
    * Tests cleaning operations with empty data array.
    */
-  public function testCleaningOperationsWithEmptyData()
-  {
+  public function testCleaningOperationsWithEmptyData() {
     $data = [];
     $cleaning_operations = [
       ['search' => 'test', 'replace' => 'replacement'],
@@ -146,9 +137,8 @@ class DataCleaningServiceTest extends TestCase
   /**
    * Tests cleaning operations with non-string data items.
    */
-  public function testCleaningOperationsWithNonStringData()
-  {
-    $data = [123, null, true, 'string'];
+  public function testCleaningOperationsWithNonStringData() {
+    $data = [123, NULL, TRUE, 'string'];
     $cleaning_operations = [
       ['search' => '12', 'replace' => 'twelve'],
       ['search' => 'string', 'replace' => 'text'],
@@ -165,8 +155,7 @@ class DataCleaningServiceTest extends TestCase
   /**
    * Tests data cleaning and sanitization.
    */
-  public function testDataCleaningAndSanitization()
-  {
+  public function testDataCleaningAndSanitization() {
     $test_data = ['<script>alert("xss")</script><p>Clean content</p>', '  Trimmed content  '];
     $cleaning_operations = [
       ['search' => '<script>', 'replace' => ''],
@@ -186,4 +175,5 @@ class DataCleaningServiceTest extends TestCase
     $this->assertEquals('<script>', $parsed_operations[0]['search']);
     $this->assertEquals('', $parsed_operations[0]['replace']);
   }
+
 }

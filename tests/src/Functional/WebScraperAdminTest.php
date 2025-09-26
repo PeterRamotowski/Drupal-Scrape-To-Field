@@ -7,8 +7,7 @@ use Drupal\Tests\BrowserTestBase;
 /**
  * Tests the web scraper administration interface.
  */
-class WebScraperAdminTest extends BrowserTestBase
-{
+class WebScraperAdminTest extends BrowserTestBase {
 
   /**
    * {@inheritdoc}
@@ -18,7 +17,7 @@ class WebScraperAdminTest extends BrowserTestBase
   /**
    * Modules to enable.
    *
-   * @var array
+   * {@inheritdoc}
    */
   protected static $modules = [
     'scrape_to_field',
@@ -47,8 +46,7 @@ class WebScraperAdminTest extends BrowserTestBase
   /**
    * {@inheritdoc}
    */
-  protected function setUp(): void
-  {
+  protected function setUp(): void {
     parent::setUp();
 
     $this->createContentType(['type' => 'article']);
@@ -86,8 +84,7 @@ class WebScraperAdminTest extends BrowserTestBase
   /**
    * Tests access to scraper configuration pages.
    */
-  public function testScraperConfigurationAccess()
-  {
+  public function testScraperConfigurationAccess() {
     // Test anonymous user cannot access admin pages.
     $this->drupalGet('/admin/config/content/web-scraper');
     $this->assertSession()->statusCodeEquals(403);
@@ -107,8 +104,7 @@ class WebScraperAdminTest extends BrowserTestBase
   /**
    * Tests the global scraper settings form.
    */
-  public function testGlobalScraperSettings()
-  {
+  public function testGlobalScraperSettings() {
     $this->drupalLogin($this->adminUser);
     $this->drupalGet('/admin/config/content/web-scraper');
 
@@ -121,8 +117,7 @@ class WebScraperAdminTest extends BrowserTestBase
   /**
    * Tests the node-specific scraper configuration.
    */
-  public function testNodeScraperConfiguration()
-  {
+  public function testNodeScraperConfiguration() {
     $this->drupalLogin($this->adminUser);
 
     $node = $this->drupalCreateNode(['type' => 'article', 'title' => 'Test Article']);
@@ -150,8 +145,7 @@ class WebScraperAdminTest extends BrowserTestBase
   /**
    * Tests permissions and access control.
    */
-  public function testPermissionsAndAccess()
-  {
+  public function testPermissionsAndAccess() {
     // Create a user with limited permissions.
     $limited_user = $this->drupalCreateUser([
       'configure any node scrape to field',
@@ -182,6 +176,5 @@ class WebScraperAdminTest extends BrowserTestBase
     $this->drupalGet("/node/{$node->id()}/scraper-config");
     $this->assertSession()->statusCodeEquals(403);
   }
-
 
 }

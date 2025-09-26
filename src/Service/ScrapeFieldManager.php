@@ -3,16 +3,13 @@
 namespace Drupal\scrape_to_field\Service;
 
 use Drupal\Core\Entity\EntityTypeManagerInterface;
+use Drupal\Core\State\StateInterface;
 use Drupal\node\NodeInterface;
-use Drupal\scrape_to_field\Service\ContentSanitizationService;
-use Drupal\scrape_to_field\Service\ScraperActivityLogger;
-use Drupal\scrape_to_field\Service\WebScraperService;
 
 /**
  * Manages web scraping operations for fields and nodes.
  */
-class ScrapeFieldManager
-{
+class ScrapeFieldManager {
 
   /**
    * The entity type manager.
@@ -35,14 +32,19 @@ class ScrapeFieldManager
   protected ContentSanitizationService $sanitizationService;
 
   /**
+   * The state service.
+   */
+  protected StateInterface $state;
+
+  /**
    * Constructs a ScrapeFieldManager object.
    */
-  public function __construct(EntityTypeManagerInterface $entity_type_manager, WebScraperService $scraper_service, ScraperActivityLogger $scraper_logger, ContentSanitizationService $sanitization_service)
-  {
+  public function __construct(EntityTypeManagerInterface $entity_type_manager, WebScraperService $scraper_service, ScraperActivityLogger $scraper_logger, ContentSanitizationService $sanitization_service, StateInterface $state) {
     $this->entityTypeManager = $entity_type_manager;
     $this->scraperService = $scraper_service;
     $this->scraperLogger = $scraper_logger;
     $this->sanitizationService = $sanitization_service;
+    $this->state = $state;
   }
 
   /**
@@ -56,8 +58,7 @@ class ScrapeFieldManager
    * @return bool
    *   TRUE if successful, FALSE otherwise.
    */
-  public function processNodeScraping(int $node_id, ?string $field_name = NULL): bool
-  {
+  public function processNodeScraping(int $node_id, ?string $field_name = NULL): bool {
     $node_storage = $this->entityTypeManager->getStorage('node');
 
     /** @var \Drupal\Core\Entity\ContentEntityInterface $node */
@@ -76,7 +77,7 @@ class ScrapeFieldManager
 
     $updated = FALSE;
 
-    // If field_name is specified, process only that field
+    // If field_name is specified, process only that field.
     $fields_to_process = $field_name ? [$field_name => $scraper_config[$field_name] ?? []] : $scraper_config;
 
     foreach ($fields_to_process as $field_name_to_process => $config) {
@@ -102,9 +103,9 @@ class ScrapeFieldManager
         $this->updateFieldWithScrapedData($node, $field_name_to_process, $sanitized_data, $config);
         $updated = TRUE;
 
-        // Update the timestamp for this specific field
+        // Update the timestamp for this specific field.
         $last_scrape_key = "scrape_to_field.last_scrape.{$node_id}.{$field_name_to_process}";
-        \Drupal::state()->set($last_scrape_key, time());
+        $this->state->set($last_scrape_key, time());
       }
     }
 
@@ -119,8 +120,7 @@ class ScrapeFieldManager
   /**
    * Checks if a node has scraper configuration.
    */
-  public function hasScraperConfig(NodeInterface $node): bool
-  {
+  public function hasScraperConfig(NodeInterface $node): bool {
     if (!$node->hasField('field_scraper_config')) {
       return FALSE;
     }
@@ -132,8 +132,7 @@ class ScrapeFieldManager
   /**
    * Gets scraper configuration for a node.
    */
-  public function getNodeScraperConfig(NodeInterface $node): array
-  {
+  public function getNodeScraperConfig(NodeInterface $node): array {
     if (!$node->hasField('field_scraper_config')) {
       return [];
     }
@@ -150,14 +149,13 @@ class ScrapeFieldManager
   /**
    * Updates a field with scraped data.
    */
-  protected function updateFieldWithScrapedData(NodeInterface $node, string $field_name, array $data, array $config): void
-  {
+  protected function updateFieldWithScrapedData(NodeInterface $node, string $field_name, array $data, array $config): void {
     $field = $node->get($field_name);
     $field_definition = $field->getFieldDefinition();
     $field_type = $field_definition->getType();
     $cardinality = $field_definition->getFieldStorageDefinition()->getCardinality();
 
-    // Handle multiple_handling setting
+    // Handle multiple_handling setting.
     $multiple_handling = $config['multiple_handling'] ?? 'first';
     $processed_data = $this->processMultipleData($data, $multiple_handling, $config, $cardinality);
 
@@ -194,8 +192,7 @@ class ScrapeFieldManager
   /**
    * Process scraped data based on multiple_handling setting.
    */
-  protected function processMultipleData(array $data, string $multiple_handling, array $config, int $cardinality): array|string
-  {
+  protected function processMultipleData(array $data, string $multiple_handling, array $config, int $cardinality): array|string {
     if (empty($data)) {
       return '';
     }
@@ -209,16 +206,18 @@ class ScrapeFieldManager
         return implode($separator, $data);
 
       case 'all':
-        // Respect field cardinality
+        // Respect field cardinality.
         if ($cardinality === 1) {
-          // Single cardinality field, join the values
+          // Single cardinality field, join the values.
           $separator = $config['separator'] ?? ', ';
           return implode($separator, $data);
-        } elseif ($cardinality === -1) {
-          // Unlimited cardinality, return all values
+        }
+        elseif ($cardinality === -1) {
+          // Unlimited cardinality, return all values.
           return $data;
-        } else {
-          // Limited cardinality, return up to the limit
+        }
+        else {
+          // Limited cardinality, return up to the limit.
           return array_slice($data, 0, $cardinality);
         }
 
@@ -235,20 +234,20 @@ class ScrapeFieldManager
    * @param array|string $processed_data
    *   The processed data to set.
    * @param array $additional_properties
-   *   Additional properties to set on each field item (e.g., 'format' for text fields).
+   *   Additional properties to set on each field item.
    * @param string|null $cast_type
    *   Optional type casting: 'int', 'float', 'string', or null for no casting.
    */
-  protected function setFieldValue($field, $processed_data, array $additional_properties = [], ?string $cast_type = null): void
-  {
+  protected function setFieldValue($field, $processed_data, array $additional_properties = [], ?string $cast_type = NULL): void {
     if (is_array($processed_data)) {
-      // For multiple values, set each one
+      // For multiple values, set each one.
       $values = array_map(function ($item) use ($additional_properties, $cast_type) {
         $value = $this->castValue($item, $cast_type);
         return array_merge(['value' => $value], $additional_properties);
       }, $processed_data);
       $field->setValue($values);
-    } else {
+    }
+    else {
       $value = $this->castValue($processed_data, $cast_type);
       $field->setValue(array_merge(['value' => $value], $additional_properties));
     }
@@ -265,9 +264,8 @@ class ScrapeFieldManager
    * @return mixed
    *   The cast value.
    */
-  protected function castValue($value, ?string $cast_type)
-  {
-    if ($cast_type === null) {
+  protected function castValue($value, ?string $cast_type) {
+    if ($cast_type === NULL) {
       return $value;
     }
 
@@ -278,4 +276,5 @@ class ScrapeFieldManager
       default => $value,
     };
   }
+
 }

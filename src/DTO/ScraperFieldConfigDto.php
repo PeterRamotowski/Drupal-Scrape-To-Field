@@ -5,8 +5,7 @@ namespace Drupal\scrape_to_field\DTO;
 /**
  * Data Transfer Object for individual field scraper configuration.
  */
-class ScraperFieldConfigDto
-{
+class ScraperFieldConfigDto {
 
   /**
    * Constructs a ScraperFieldConfigDto object.
@@ -22,7 +21,7 @@ class ScraperFieldConfigDto
     public readonly string $separator = ', ',
     public readonly string $textFormat = 'plain_text',
     public readonly string $frequency = '',
-    public readonly bool $enableCleaning = false,
+    public readonly bool $enableCleaning = FALSE,
     public readonly array $cleaningOperations = [],
   ) {
   }
@@ -30,10 +29,9 @@ class ScraperFieldConfigDto
   /**
    * Creates a DTO from array configuration.
    */
-  public static function fromArray(array $config): self
-  {
+  public static function fromArray(array $config): self {
     return new self(
-      enabled: $config['enabled'] ?? false,
+      enabled: $config['enabled'] ?? FALSE,
       url: $config['url'] ?? '',
       selector: $config['selector'] ?? '',
       selectorType: $config['selector_type'] ?? 'css',
@@ -43,7 +41,7 @@ class ScraperFieldConfigDto
       separator: $config['separator'] ?? ', ',
       textFormat: $config['text_format'] ?? 'plain_text',
       frequency: $config['frequency'] ?? '',
-      enableCleaning: $config['enable_cleaning'] ?? false,
+      enableCleaning: $config['enable_cleaning'] ?? FALSE,
       cleaningOperations: $config['cleaning_operations'] ?? [],
     );
   }
@@ -51,8 +49,7 @@ class ScraperFieldConfigDto
   /**
    * Creates a DTO from form field values.
    */
-  public static function fromFormValues(array $field_values, array $cleaning_operations = []): self
-  {
+  public static function fromFormValues(array $field_values, array $cleaning_operations = []): self {
     return new self(
       enabled: !empty($field_values['enabled']),
       url: $field_values['source_config']['url'] ?? '',
@@ -72,8 +69,7 @@ class ScraperFieldConfigDto
   /**
    * Converts DTO to array format.
    */
-  public function toArray(): array
-  {
+  public function toArray(): array {
     return [
       'enabled' => $this->enabled,
       'url' => $this->url,
@@ -93,14 +89,14 @@ class ScraperFieldConfigDto
   /**
    * Validates the configuration.
    */
-  public function validate(): array
-  {
+  public function validate(): array {
     $errors = [];
 
     if ($this->enabled) {
       if (empty($this->url)) {
         $errors[] = 'URL is required when scraping is enabled.';
-      } elseif (!filter_var($this->url, FILTER_VALIDATE_URL)) {
+      }
+      elseif (!filter_var($this->url, FILTER_VALIDATE_URL)) {
         $errors[] = 'URL must be a valid URL.';
       }
 
@@ -131,17 +127,15 @@ class ScraperFieldConfigDto
   /**
    * Checks if the configuration is valid.
    */
-  public function isValid(): bool
-  {
+  public function isValid(): bool {
     return empty($this->validate());
   }
 
   /**
    * Returns a disabled configuration.
    */
-  public static function disabled(): self
-  {
-    return new self(enabled: false, url: '', selector: '', selectorType: 'css', extractMethod: 'text');
+  public static function disabled(): self {
+    return new self(enabled: FALSE, url: '', selector: '', selectorType: 'css', extractMethod: 'text');
   }
 
 }

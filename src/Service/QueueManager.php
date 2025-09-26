@@ -2,16 +2,15 @@
 
 namespace Drupal\scrape_to_field\Service;
 
+use Drupal\Core\Config\ConfigFactoryInterface;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\Core\Queue\QueueFactory;
-use Drupal\scrape_to_field\Service\ScrapeFieldManager;
-use Drupal\scrape_to_field\Service\ScraperActivityLogger;
+use Drupal\Core\State\StateInterface;
 
 /**
  * Manages queues.
  */
-class QueueManager
-{
+class QueueManager {
 
   /**
    * The entity type manager.
@@ -34,25 +33,36 @@ class QueueManager
   protected ScraperActivityLogger $scraperLogger;
 
   /**
+   * The config factory.
+   */
+  protected ConfigFactoryInterface $configFactory;
+
+  /**
+   * The state service.
+   */
+  protected StateInterface $state;
+
+  /**
    * Constructs a QueueManager object.
    */
-  public function __construct(EntityTypeManagerInterface $entity_type_manager, QueueFactory $queue_factory, ScrapeFieldManager $scrape_field_manager, ScraperActivityLogger $scraper_logger)
-  {
+  public function __construct(EntityTypeManagerInterface $entity_type_manager, QueueFactory $queue_factory, ScrapeFieldManager $scrape_field_manager, ScraperActivityLogger $scraper_logger, ConfigFactoryInterface $config_factory, StateInterface $state) {
     $this->entityTypeManager = $entity_type_manager;
     $this->queueFactory = $queue_factory;
     $this->scrapeFieldManager = $scrape_field_manager;
     $this->scraperLogger = $scraper_logger;
+    $this->configFactory = $config_factory;
+    $this->state = $state;
   }
 
   /**
    * Queues scraping jobs for fields respecting individual field frequencies.
    */
-  public function queueScrapingJobsWithFrequency(): int
-  {
+  public function queueScrapingJobsWithFrequency(): int {
     $queued = 0;
     $queue = $this->queueFactory->get('scrape_to_field_queue');
-    $config = \Drupal::config('scrape_to_field.settings');
-    $global_frequency = $config->get('cron_frequency') ?? 21600; // Default 6 hours
+    $config = $this->configFactory->get('scrape_to_field.settings');
+    // Default 6 hours.
+    $global_frequency = $config->get('cron_frequency') ?? 21600;
     $current_time = time();
 
     // Get all nodes with scraper configurations.
@@ -77,12 +87,12 @@ class QueueManager
           continue;
         }
 
-        // Determine the frequency for this field
+        // Determine the frequency for this field.
         $field_frequency = !empty($field_config['frequency']) ? (int) $field_config['frequency'] : $global_frequency;
 
-        // Check if enough time has passed since last scrape for this field
+        // Check if enough time has passed since last scrape for this field.
         $last_scrape_key = "scrape_to_field.last_scrape.{$nid}.{$field_name}";
-        $last_scrape = \Drupal::state()->get($last_scrape_key, 0);
+        $last_scrape = $this->state->get($last_scrape_key, 0);
 
         if (($current_time - $last_scrape) >= $field_frequency) {
           $queue->createItem([

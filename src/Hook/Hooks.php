@@ -6,6 +6,7 @@ use Drupal\Core\Entity\EntityInterface;
 use Drupal\Core\Entity\EntityTypeInterface;
 use Drupal\Core\Field\FieldStorageDefinitionInterface;
 use Drupal\Core\Hook\Attribute\Hook;
+use Drupal\Core\StringTranslation\StringTranslationTrait;
 use Drupal\Core\Url;
 
 /**
@@ -13,16 +14,18 @@ use Drupal\Core\Url;
  */
 class Hooks {
 
+  use StringTranslationTrait;
+
   /**
    * Implements hook_entity_base_field_info().
    */
   #[Hook('entity_base_field_info')]
   public function scraperConfigEntityBaseFieldInfo(EntityTypeInterface $entity_type) {
     $fields = [];
-    
+
     if ($entity_type->id() == 'node') {
       $scraper_config_field_definition = \Drupal::entityDefinitionUpdateManager()->getFieldStorageDefinition('field_scraper_config', 'node');
-      
+
       if ($scraper_config_field_definition instanceof FieldStorageDefinitionInterface) {
         /** @var \Drupal\Core\Field\BaseFieldDefinition $scraper_config_field_definition */
         $scraper_config_field_definition->setDisplayOptions('form', [
@@ -33,7 +36,7 @@ class Hooks {
         $fields['field_scraper_config'] = $scraper_config_field_definition;
       }
     }
-    
+
     return $fields;
   }
 
@@ -66,7 +69,7 @@ class Hooks {
 
     if ($entity->getEntityTypeId() === 'node') {
       $operations['scraper_config'] = [
-        'title' => t('Scraper configuration'),
+        'title' => $this->t('Scraper configuration'),
         'url' => Url::fromRoute('scrape_to_field.node_scraper_config', [
           'node' => $entity->id(),
         ]),

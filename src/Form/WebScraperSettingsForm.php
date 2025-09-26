@@ -8,30 +8,26 @@ use Drupal\Core\Form\FormStateInterface;
 /**
  * Configure scrape to field settings.
  */
-class WebScraperSettingsForm extends ConfigFormBase
-{
+class WebScraperSettingsForm extends ConfigFormBase {
 
   /**
    * {@inheritdoc}
    */
-  public function getFormId()
-  {
+  public function getFormId() {
     return 'scrape_to_field_settings';
   }
 
   /**
    * {@inheritdoc}
    */
-  protected function getEditableConfigNames()
-  {
+  protected function getEditableConfigNames() {
     return ['scrape_to_field.settings'];
   }
 
   /**
    * {@inheritdoc}
    */
-  public function buildForm(array $form, FormStateInterface $form_state)
-  {
+  public function buildForm(array $form, FormStateInterface $form_state) {
     $config = $this->config('scrape_to_field.settings');
 
     $form['general'] = [
@@ -102,7 +98,8 @@ class WebScraperSettingsForm extends ConfigFormBase
       '#title' => $this->t('Maximum content length'),
       '#default_value' => $config->get('max_content_length') ?: 65535,
       '#min' => 1000,
-      '#max' => 16777215, // MySQL MEDIUMTEXT limit
+    // MySQL MEDIUMTEXT limit.
+      '#max' => 16777215,
       '#description' => $this->t('Maximum length of scraped content in characters. Longer content will be truncated.'),
     ];
 
@@ -112,8 +109,7 @@ class WebScraperSettingsForm extends ConfigFormBase
   /**
    * {@inheritdoc}
    */
-  public function submitForm(array &$form, FormStateInterface $form_state)
-  {
+  public function submitForm(array &$form, FormStateInterface $form_state) {
     $this->config('scrape_to_field.settings')
       ->set('timeout', $form_state->getValue('timeout'))
       ->set('verify_ssl', $form_state->getValue('verify_ssl'))
@@ -125,4 +121,5 @@ class WebScraperSettingsForm extends ConfigFormBase
 
     parent::submitForm($form, $form_state);
   }
+
 }

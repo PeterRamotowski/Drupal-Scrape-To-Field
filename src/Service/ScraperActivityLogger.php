@@ -8,7 +8,7 @@ use Drupal\node\NodeInterface;
 
 /**
  * Service for logging scraper activities with detailed context.
- * 
+ *
  * All log methods ensure that placeholders (@variables) are never null
  * to prevent Html::escape() errors when views render the log messages.
  */
@@ -101,7 +101,7 @@ class ScraperActivityLogger {
   /**
    * Log HTTP request failures during scraping.
    */
-  public function logRequestFailure(string $url, ?string $error_message = null): void {
+  public function logRequestFailure(string $url, ?string $error_message = NULL): void {
     $this->logger->error('Failed to scrape @url: @error', [
       '@url' => $url ?: 'empty',
       '@error' => $error_message ?: 'Unknown request error',
@@ -111,7 +111,7 @@ class ScraperActivityLogger {
   /**
    * Log unexpected errors during scraping.
    */
-  public function logUnexpectedError(string $url, ?string $error_message = null): void {
+  public function logUnexpectedError(string $url, ?string $error_message = NULL): void {
     $this->logger->error('Unexpected error while scraping @url: @error', [
       '@url' => $url ?: 'empty',
       '@error' => $error_message ?: 'Unknown error',

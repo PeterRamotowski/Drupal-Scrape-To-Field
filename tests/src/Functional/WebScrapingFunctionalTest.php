@@ -7,8 +7,7 @@ use Drupal\Tests\BrowserTestBase;
 /**
  * Tests the actual web scraping functionality.
  */
-class WebScrapingFunctionalTest extends BrowserTestBase
-{
+class WebScrapingFunctionalTest extends BrowserTestBase {
 
   /**
    * {@inheritdoc}
@@ -18,7 +17,7 @@ class WebScrapingFunctionalTest extends BrowserTestBase
   /**
    * Modules to enable.
    *
-   * @var array
+   * {@inheritdoc}
    */
   protected static $modules = [
     'scrape_to_field',
@@ -40,8 +39,7 @@ class WebScrapingFunctionalTest extends BrowserTestBase
   /**
    * {@inheritdoc}
    */
-  protected function setUp(): void
-  {
+  protected function setUp(): void {
     parent::setUp();
 
     $this->createContentType(['type' => 'test_content']);
@@ -61,8 +59,7 @@ class WebScrapingFunctionalTest extends BrowserTestBase
   /**
    * Creates a field with storage for testing.
    */
-  protected function createFieldWithStorage($field_name, $field_type, $bundle)
-  {
+  protected function createFieldWithStorage($field_name, $field_type, $bundle) {
     $field_storage = \Drupal::entityTypeManager()
       ->getStorage('field_storage_config')
       ->create([
@@ -105,8 +102,7 @@ class WebScrapingFunctionalTest extends BrowserTestBase
   /**
    * Tests queue functionality for background scraping.
    */
-  public function testQueueFunctionality()
-  {
+  public function testQueueFunctionality() {
     $this->drupalLogin($this->adminUser);
 
     $node = $this->drupalCreateNode([
@@ -140,11 +136,14 @@ class WebScrapingFunctionalTest extends BrowserTestBase
       $item = $queue->claimItem();
       $this->assertNotFalse($item);
 
-      try {
-        $queue_worker->processItem($item->data);
-        $queue->deleteItem($item);
-      } catch (\Exception $e) {
-        $queue->releaseItem($item);
+      if ($item && is_object($item) && property_exists($item, 'data')) {
+        try {
+          $queue_worker->processItem($item->data);
+          $queue->deleteItem($item);
+        }
+        catch (\Exception $e) {
+          $queue->releaseItem($item);
+        }
       }
     }
   }
@@ -152,8 +151,7 @@ class WebScrapingFunctionalTest extends BrowserTestBase
   /**
    * Tests scraping validation and error handling.
    */
-  public function testScrapingValidationAndErrorHandling()
-  {
+  public function testScrapingValidationAndErrorHandling() {
     $this->drupalLogin($this->adminUser);
 
     $node = $this->drupalCreateNode([
@@ -166,7 +164,7 @@ class WebScrapingFunctionalTest extends BrowserTestBase
 
     $page_content = $this->getSession()->getPage()->getContent();
 
-    if (strpos($page_content, 'global_settings') !== false) {
+    if (strpos($page_content, 'global_settings') !== FALSE) {
       $this->assertSession()->fieldExists('global_settings[scraping_enabled]');
 
       $title_field_exists = $this->getSession()->getPage()->findField('field_field_scraped_title[enabled]');
@@ -187,9 +185,9 @@ class WebScrapingFunctionalTest extends BrowserTestBase
 
         $page_content = $this->getSession()->getPage()->getContent();
         $this->assertTrue(
-          strpos($page_content, 'Please enter a valid URL') !== false ||
-            strpos($page_content, 'valid URL') !== false ||
-            strpos($page_content, 'error') !== false,
+          strpos($page_content, 'Please enter a valid URL') !== FALSE ||
+            strpos($page_content, 'valid URL') !== FALSE ||
+            strpos($page_content, 'error') !== FALSE,
           'Expected URL validation error message'
         );
 
@@ -208,13 +206,13 @@ class WebScrapingFunctionalTest extends BrowserTestBase
 
         $page_content = $this->getSession()->getPage()->getContent();
         $this->assertTrue(
-          strpos($page_content, 'Selector is required') !== false ||
-            strpos($page_content, 'required') !== false ||
-            strpos($page_content, 'error') !== false,
+          strpos($page_content, 'Selector is required') !== FALSE ||
+            strpos($page_content, 'required') !== FALSE ||
+            strpos($page_content, 'error') !== FALSE,
           'Expected selector validation error message'
         );
 
-        // Test valid configuration should work (or show service validation errors)
+        // Test valid configuration should work.
         $edit = [
           'global_settings[scraping_enabled]' => TRUE,
           'field_field_scraped_title[enabled]' => TRUE,
@@ -225,19 +223,22 @@ class WebScrapingFunctionalTest extends BrowserTestBase
         $this->submitForm($edit, 'Save configuration');
 
         $current_url = $this->getSession()->getCurrentUrl();
-        if (strpos($current_url, 'scraper-config') !== false) {
+        if (strpos($current_url, 'scraper-config') !== FALSE) {
           $page_content = $this->getSession()->getPage()->getContent();
           $this->assertTrue(
-            strpos($page_content, 'error') !== false || strpos($page_content, 'Scraper configuration error') !== false,
+            strpos($page_content, 'error') !== FALSE || strpos($page_content, 'Scraper configuration error') !== FALSE,
             'Expected service validation errors when external URL cannot be validated'
           );
-        } else {
+        }
+        else {
           $this->assertSession()->addressMatches('/\/node\/\d+$/');
         }
-      } else {
+      }
+      else {
         $this->markTestSkipped('Required field not available for validation testing');
       }
-    } else {
+    }
+    else {
       $this->markTestSkipped('Form validation cannot be tested - no compatible fields');
     }
   }
@@ -245,8 +246,7 @@ class WebScrapingFunctionalTest extends BrowserTestBase
   /**
    * Tests integration with Drupal's cron system.
    */
-  public function testCronIntegration()
-  {
+  public function testCronIntegration() {
     $queue = \Drupal::service('queue')->get('scrape_to_field_queue');
     $queue->createItem([
       'node_id' => 1,
@@ -269,11 +269,10 @@ class WebScrapingFunctionalTest extends BrowserTestBase
     $this->assertLessThanOrEqual($initial_count, $final_count);
   }
 
-    /**
+  /**
    * Tests scraping with multiple field mappings.
    */
-  public function testMultipleFieldMappings()
-  {
+  public function testMultipleFieldMappings() {
     $this->drupalLogin($this->adminUser);
 
     $node = $this->drupalCreateNode([
@@ -286,12 +285,12 @@ class WebScrapingFunctionalTest extends BrowserTestBase
 
     $page_content = $this->getSession()->getPage()->getContent();
 
-    if (strpos($page_content, 'No fields of supported types') !== false) {
+    if (strpos($page_content, 'No fields of supported types') !== FALSE) {
       $this->fail('Fields should be available for testing multiple mappings');
       return;
     }
 
-    // Check if both fields exist before attempting to configure them
+    // Check if both fields exist before attempting to configure them.
     $title_field_exists = $this->getSession()->getPage()->findField('field_field_scraped_title[enabled]');
     $body_field_exists = $this->getSession()->getPage()->findField('field_field_scraped_body[enabled]');
 
@@ -299,7 +298,7 @@ class WebScrapingFunctionalTest extends BrowserTestBase
     $this->assertNotNull($body_field_exists, 'field_scraped_body should be available');
 
     if ($title_field_exists && $body_field_exists) {
-      // Configure both fields
+      // Configure both fields.
       $edit = [
         'global_settings[scraping_enabled]' => TRUE,
         'field_field_scraped_title[enabled]' => TRUE,
@@ -315,13 +314,14 @@ class WebScrapingFunctionalTest extends BrowserTestBase
       $this->submitForm($edit, 'Save configuration');
 
       $current_url = $this->getSession()->getCurrentUrl();
-      if (strpos($current_url, 'scraper-config') !== false) {
+      if (strpos($current_url, 'scraper-config') !== FALSE) {
         $page_content = $this->getSession()->getPage()->getContent();
-        if (strpos($page_content, 'error') !== false) {
-          $this->assertTrue(true, 'Form validation is working (validation errors found)');
+        if (strpos($page_content, 'error') !== FALSE) {
+          $this->assertTrue(TRUE, 'Form validation is working (validation errors found)');
           return;
         }
-      } else {
+      }
+      else {
         $this->assertSession()->addressMatches('/\/node\/\d+$/');
 
         $scraper_manager = \Drupal::service('scrape_to_field.manager');
@@ -339,4 +339,5 @@ class WebScrapingFunctionalTest extends BrowserTestBase
       }
     }
   }
+
 }
