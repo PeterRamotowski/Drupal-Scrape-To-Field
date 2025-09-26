@@ -2,11 +2,13 @@
 
 namespace Drupal\Tests\scrape_to_field\Functional;
 
-use GuzzleHttp\Client;
+use Drupal\node\Entity\Node;
 use Drupal\scrape_to_field\DTO\NodeScraperConfigDto;
 use Drupal\scrape_to_field\DTO\ScraperFieldConfigDto;
+use Drupal\scrape_to_field\Service\ScrapeFieldManager;
+use Drupal\scrape_to_field\Service\WebScraperService;
 use Drupal\Tests\BrowserTestBase;
-use Drupal\node\Entity\Node;
+use GuzzleHttp\Client;
 use GuzzleHttp\Handler\MockHandler;
 use GuzzleHttp\HandlerStack;
 use GuzzleHttp\Psr7\Response;
@@ -387,11 +389,11 @@ class WebScrapingWithMockTest extends BrowserTestBase {
     $handlerStack = HandlerStack::create($mock);
     $client = new Client(['handler' => $handlerStack]);
 
-    // Reset the container services to ensure our mock is used
+    // Reset the container services to ensure our mock is used.
     $this->container->set('http_client', $client);
-    
-    // Also rebuild the scraper service with the new client
-    $scraper_service = new \Drupal\scrape_to_field\Service\WebScraperService(
+
+    // Also rebuild the scraper service with the new client.
+    $scraper_service = new WebScraperService(
       $client,
       $this->container->get('config.factory'),
       $this->container->get('scrape_to_field.user_agent'),
@@ -399,9 +401,9 @@ class WebScrapingWithMockTest extends BrowserTestBase {
       $this->container->get('scrape_to_field.data_cleaning')
     );
     $this->container->set('scrape_to_field.scraper', $scraper_service);
-    
-    // Rebuild the manager service with the new scraper
-    $manager = new \Drupal\scrape_to_field\Service\ScrapeFieldManager(
+
+    // Rebuild the manager service with the new scraper.
+    $manager = new ScrapeFieldManager(
       $this->container->get('entity_type.manager'),
       $scraper_service,
       $this->container->get('scrape_to_field.activity_logger'),
