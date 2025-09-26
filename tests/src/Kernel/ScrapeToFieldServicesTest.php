@@ -1,0 +1,166 @@
+<?php
+
+namespace Drupal\Tests\scrape_to_field\Kernel;
+
+use Drupal\KernelTests\KernelTestBase;
+
+/**
+ * Tests the scrape_to_field services in a kernel environment.
+ */
+class ScrapeToFieldServicesTest extends KernelTestBase
+{
+
+  /**
+   * {@inheritdoc}
+   */
+  protected static $modules = [
+    'scrape_to_field',
+    'system',
+    'user',
+    'node',
+    'field',
+  ];
+
+  /**
+   * Tests that all scrape_to_field services can be instantiated.
+   */
+  public function testServicesCanBeInstantiated()
+  {
+    $scraper = $this->container->get('scrape_to_field.scraper');
+    $this->assertInstanceOf('Drupal\scrape_to_field\Service\WebScraperService', $scraper);
+
+    $manager = $this->container->get('scrape_to_field.manager');
+    $this->assertInstanceOf('Drupal\scrape_to_field\Service\ScrapeFieldManager', $manager);
+
+    $queue_manager = $this->container->get('scrape_to_field.queue');
+    $this->assertInstanceOf('Drupal\scrape_to_field\Service\QueueManager', $queue_manager);
+
+    $activity_logger = $this->container->get('scrape_to_field.activity_logger');
+    $this->assertInstanceOf('Drupal\scrape_to_field\Service\ScraperActivityLogger', $activity_logger);
+
+    $user_agent = $this->container->get('scrape_to_field.user_agent');
+    $this->assertInstanceOf('Drupal\scrape_to_field\Service\UserAgentService', $user_agent);
+
+    $data_cleaning = $this->container->get('scrape_to_field.data_cleaning');
+    $this->assertInstanceOf('Drupal\scrape_to_field\Service\DataCleaningService', $data_cleaning);
+  }
+
+  /**
+   * Tests the UserAgentService.
+   */
+  public function testUserAgentService()
+  {
+    $user_agent_service = $this->container->get('scrape_to_field.user_agent');
+
+    $user_agent = $user_agent_service->getRandomUserAgent();
+    $this->assertIsString($user_agent);
+    $this->assertNotEmpty($user_agent);
+
+    $user_agents = [];
+    for ($i = 0; $i < 10; $i++) {
+      $user_agents[] = $user_agent_service->getRandomUserAgent();
+    }
+
+    $unique_agents = array_unique($user_agents);
+    $this->assertGreaterThan(1, count($unique_agents));
+  }
+
+  /**
+   * Tests the WebScraperService with invalid inputs.
+   */
+  public function testWebScraperServiceValidation()
+  {
+    $scraper_service = $this->container->get('scrape_to_field.scraper');
+
+    // Test with invalid URL.
+    $result = $scraper_service->scrapeData('not-a-url', 'h1', 'css');
+    $this->assertNull($result);
+
+    // Test with empty selector.
+    $result = $scraper_service->scrapeData('https://example.com', '', 'css');
+    $this->assertNull($result);
+
+    // Test with invalid selector type.
+    $result = $scraper_service->scrapeData('https://example.com', 'h1', 'invalid');
+    $this->assertNull($result);
+  }
+
+  /**
+   * Tests the queue functionality.
+   */
+  public function testQueueFunctionality()
+  {
+    $queue_manager = $this->container->get('scrape_to_field.queue');
+    $queue = $this->container->get('queue')->get('scrape_to_field_queue');
+
+    $queue->deleteQueue();
+    $this->assertEquals(0, $queue->numberOfItems());
+
+    $queue->createItem([
+      'node_id' => 1,
+      'field_name' => 'title',
+      'timestamp' => time(),
+    ]);
+
+    $this->assertEquals(1, $queue->numberOfItems());
+
+    // Test queue item structure.
+    $item = $queue->claimItem();
+    $this->assertNotFalse($item);
+    $this->assertIsArray($item->data);
+    $this->assertArrayHasKey('node_id', $item->data);
+    $this->assertArrayHasKey('field_name', $item->data);
+    $this->assertArrayHasKey('timestamp', $item->data);
+
+    $queue->releaseItem($item);
+  }
+
+  /**
+   * Tests the scraper activity logger.
+   */
+  public function testScraperActivityLogger()
+  {
+    /** @var \Drupal\scrape_to_field\Service\ScraperActivityLogger $activity_logger */
+    $activity_logger = $this->container->get('scrape_to_field.activity_logger');
+
+    // Test that logging methods exist and don't crash.
+    $activity_logger->logScrapingSuccess('https://example.com', 5);
+    $activity_logger->logRequestFailure('https://example.com', 'Timeout error');
+    $activity_logger->logInvalidUrl('bad-url');
+    $activity_logger->logEmptySelector('https://example.com');
+    $activity_logger->logInvalidSelectorType('invalid', 'https://example.com');
+
+    $this->assertTrue(TRUE);
+  }
+
+  /**
+   * Tests configuration integration.
+   */
+  public function testConfigurationIntegration()
+  {
+    $config = $this->config('scrape_to_field.settings');
+
+    $timeout = $config->get('timeout');
+    $max_retries = $config->get('max_retries');
+    $retry_delay = $config->get('retry_delay');
+
+    $this->assertTrue($timeout === NULL || is_numeric($timeout));
+    $this->assertTrue($max_retries === NULL || is_numeric($max_retries));
+    $this->assertTrue($retry_delay === NULL || is_numeric($retry_delay));
+  }
+
+  /**
+   * Tests queue worker plugin.
+   */
+  public function testQueueWorkerPlugin()
+  {
+    $plugin_manager = $this->container->get('plugin.manager.queue_worker');
+
+    $plugins = $plugin_manager->getDefinitions();
+    $this->assertArrayHasKey('scrape_to_field_queue', $plugins);
+
+    // Test that we can create an instance.
+    $queue_worker = $plugin_manager->createInstance('scrape_to_field_queue');
+    $this->assertInstanceOf('Drupal\scrape_to_field\Plugin\QueueWorker\ScrapeToFieldQueueWorker', $queue_worker);
+  }
+}
