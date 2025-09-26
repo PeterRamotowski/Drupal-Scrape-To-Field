@@ -4,6 +4,7 @@ namespace Drupal\scrape_to_field\Service;
 
 use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\node\NodeInterface;
+use Drupal\scrape_to_field\Service\ContentSanitizationService;
 use Drupal\scrape_to_field\Service\ScraperActivityLogger;
 use Drupal\scrape_to_field\Service\WebScraperService;
 
@@ -29,13 +30,19 @@ class ScrapeFieldManager
   protected ScraperActivityLogger $scraperLogger;
 
   /**
+   * The content sanitization service.
+   */
+  protected ContentSanitizationService $sanitizationService;
+
+  /**
    * Constructs a ScrapeFieldManager object.
    */
-  public function __construct(EntityTypeManagerInterface $entity_type_manager, WebScraperService $scraper_service, ScraperActivityLogger $scraper_logger)
+  public function __construct(EntityTypeManagerInterface $entity_type_manager, WebScraperService $scraper_service, ScraperActivityLogger $scraper_logger, ContentSanitizationService $sanitization_service)
   {
     $this->entityTypeManager = $entity_type_manager;
     $this->scraperService = $scraper_service;
     $this->scraperLogger = $scraper_logger;
+    $this->sanitizationService = $sanitization_service;
   }
 
   /**
@@ -90,9 +97,11 @@ class ScrapeFieldManager
       );
 
       if ($scraped_data !== NULL && !empty($scraped_data)) {
-        $this->updateFieldWithScrapedData($node, $field_name_to_process, $scraped_data, $config);
+        $sanitized_data = $this->sanitizationService->sanitizeScrapedData($scraped_data, $config);
+
+        $this->updateFieldWithScrapedData($node, $field_name_to_process, $sanitized_data, $config);
         $updated = TRUE;
-        
+
         // Update the timestamp for this specific field
         $last_scrape_key = "scrape_to_field.last_scrape.{$node_id}.{$field_name_to_process}";
         \Drupal::state()->set($last_scrape_key, time());
