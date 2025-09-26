@@ -1,0 +1,6 @@
+scrape_to_field.admin_config:
+  title: 'Scrape to field Settings'
+  description: 'Configure web scraping functionality for content type fields'
+  parent: system.admin_config_content
+  route_name: scrape_to_field.admin_config
+  weight: 10
