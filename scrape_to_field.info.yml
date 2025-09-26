@@ -1,10 +1,10 @@
 name: 'Scrape to field'
 description: 'Provides web scraping functionality for content type fields with background processing'
 type: module
+package: 'Other'
+configure: scrape_to_field.admin_config
 core_version_requirement: ^11
 dependencies:
   - drupal:field
   - drupal:automated_cron
   - drupal:dblog
-package: Custom
-configure: scrape_to_field.admin_config
