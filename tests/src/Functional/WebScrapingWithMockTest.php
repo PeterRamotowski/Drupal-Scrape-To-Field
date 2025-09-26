@@ -86,7 +86,6 @@ class WebScrapingWithMockTest extends BrowserTestBase {
    */
   public function testScrapingSimpleHtmlFixtureWithCssSelectors() {
     $html_content = $this->getFixtureContent('test_page.html');
-    $this->mockHttpClient($html_content);
 
     $node = $this->createTestNodeWithConfig([
       'field_scraped_title' => [
@@ -101,6 +100,7 @@ class WebScrapingWithMockTest extends BrowserTestBase {
       ],
     ]);
 
+    $this->mockHttpClient($html_content);
     $this->processScrapingQueue($node);
 
     $updated_node = $this->reloadNode($node);
@@ -114,7 +114,6 @@ class WebScrapingWithMockTest extends BrowserTestBase {
    */
   public function testScrapingComplexHtmlFixtureWithMultipleFields() {
     $html_content = $this->getFixtureContent('complex_test_page.html');
-    $this->mockHttpClient($html_content);
 
     $node = $this->createTestNodeWithConfig([
       'field_scraped_title' => [
@@ -134,6 +133,7 @@ class WebScrapingWithMockTest extends BrowserTestBase {
       ],
     ]);
 
+    $this->mockHttpClient($html_content);
     $this->processScrapingQueue($node);
 
     $updated_node = $this->reloadNode($node);
@@ -148,7 +148,6 @@ class WebScrapingWithMockTest extends BrowserTestBase {
    */
   public function testXpathSelectorFunctionalityWithFixture() {
     $html_content = $this->getFixtureContent('test_page.html');
-    $this->mockHttpClient($html_content);
 
     $node = $this->createTestNodeWithConfig([
       'field_scraped_title' => [
@@ -168,6 +167,7 @@ class WebScrapingWithMockTest extends BrowserTestBase {
       ],
     ]);
 
+    $this->mockHttpClient($html_content);
     $this->processScrapingQueue($node);
 
     $updated_node = $this->reloadNode($node);
@@ -182,7 +182,6 @@ class WebScrapingWithMockTest extends BrowserTestBase {
    */
   public function testMalformedHtmlHandlingWithFixture() {
     $html_content = $this->getFixtureContent('malformed_html.html');
-    $this->mockHttpClient($html_content);
 
     $node = $this->createTestNodeWithConfig([
       'field_scraped_title' => [
@@ -192,6 +191,7 @@ class WebScrapingWithMockTest extends BrowserTestBase {
       ],
     ]);
 
+    $this->mockHttpClient($html_content);
     $this->processScrapingQueue($node);
 
     $updated_node = $this->reloadNode($node);
@@ -231,8 +231,6 @@ class WebScrapingWithMockTest extends BrowserTestBase {
     ];
 
     foreach ($test_cases as $index => $test_case) {
-      $this->mockHttpClient($html_content);
-
       $node = $this->createTestNodeWithConfig([
         'field_scraped_title' => [
           'url' => 'https://example.com/css-test-' . $index,
@@ -241,6 +239,7 @@ class WebScrapingWithMockTest extends BrowserTestBase {
         ],
       ]);
 
+      $this->mockHttpClient($html_content);
       $this->processScrapingQueue($node);
 
       $updated_node = $this->reloadNode($node);
@@ -386,8 +385,30 @@ class WebScrapingWithMockTest extends BrowserTestBase {
       new Response(200, [], $html_content),
     ]);
     $handlerStack = HandlerStack::create($mock);
+    $client = new Client(['handler' => $handlerStack]);
 
-    $this->container->set('http_client', new Client(['handler' => $handlerStack]));
+    // Reset the container services to ensure our mock is used
+    $this->container->set('http_client', $client);
+    
+    // Also rebuild the scraper service with the new client
+    $scraper_service = new \Drupal\scrape_to_field\Service\WebScraperService(
+      $client,
+      $this->container->get('config.factory'),
+      $this->container->get('scrape_to_field.user_agent'),
+      $this->container->get('scrape_to_field.activity_logger'),
+      $this->container->get('scrape_to_field.data_cleaning')
+    );
+    $this->container->set('scrape_to_field.scraper', $scraper_service);
+    
+    // Rebuild the manager service with the new scraper
+    $manager = new \Drupal\scrape_to_field\Service\ScrapeFieldManager(
+      $this->container->get('entity_type.manager'),
+      $scraper_service,
+      $this->container->get('scrape_to_field.activity_logger'),
+      $this->container->get('scrape_to_field.content_sanitization'),
+      $this->container->get('state')
+    );
+    $this->container->set('scrape_to_field.manager', $manager);
   }
 
 }
