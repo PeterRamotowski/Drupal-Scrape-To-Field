@@ -3,12 +3,13 @@
 namespace Drupal\scrape_to_field\Hook;
 
 use Drupal\Core\Config\ConfigFactoryInterface;
-use Drupal\Core\Entity\EntityDefinitionUpdateManagerInterface;
 use Drupal\Core\Entity\EntityInterface;
 use Drupal\Core\Entity\EntityTypeInterface;
-use Drupal\Core\Field\FieldStorageDefinitionInterface;
+use Drupal\Core\Field\BaseFieldDefinition;
 use Drupal\Core\Hook\Attribute\Hook;
+use Drupal\Core\KeyValueStore\KeyValueFactoryInterface;
 use Drupal\Core\StringTranslation\StringTranslationTrait;
+use Drupal\Core\StringTranslation\TranslatableMarkup;
 use Drupal\Core\Url;
 use Drupal\scrape_to_field\Service\QueueManager;
 use Drupal\scrape_to_field\Service\ScraperActivityLogger;
@@ -22,12 +23,13 @@ class Hooks {
   use StringTranslationTrait;
 
   public function __construct(
-    protected EntityDefinitionUpdateManagerInterface $entityDefinitionUpdateManager,
     protected ConfigFactoryInterface $configFactory,
     #[Autowire(service: 'scrape_to_field.activity_logger')]
     protected ScraperActivityLogger $scraperLogger,
     #[Autowire(service: 'scrape_to_field.queue')]
     protected QueueManager $queueManager,
+    #[Autowire(service: 'keyvalue')]
+    protected KeyValueFactoryInterface $keyValueFactory,
   ) {}
 
   /**
@@ -37,19 +39,31 @@ class Hooks {
   public function scraperConfigEntityBaseFieldInfo(EntityTypeInterface $entity_type) {
     $fields = [];
 
-    if ($entity_type->id() == 'node') {
-      $scraper_config_field_definition = $this->entityDefinitionUpdateManager->getFieldStorageDefinition('field_scraper_config', 'node');
-
-      if ($scraper_config_field_definition instanceof FieldStorageDefinitionInterface) {
-        /** @var \Drupal\Core\Field\BaseFieldDefinition $scraper_config_field_definition */
-        $scraper_config_field_definition->setDisplayOptions('form', [
-          'region' => 'hidden',
-        ])->setDisplayOptions('view', [
-          'region' => 'hidden',
-        ]);
-        $fields['field_scraper_config'] = $scraper_config_field_definition;
-      }
+    if ($entity_type->id() !== 'node') {
+      return $fields;
     }
+
+    // Only provide the field if it's actually installed in the database.
+    // This prevents errors during module install/uninstall.
+    $key_value = $this->keyValueFactory->get('entity.definitions.installed');
+    $installed_definitions = $key_value->get('node.field_storage_definitions', []);
+
+    if (!isset($installed_definitions['field_scraper_config'])) {
+      return $fields;
+    }
+
+    $fields['field_scraper_config'] = BaseFieldDefinition::create('string_long')
+      ->setLabel(new TranslatableMarkup('Scrape to field Configuration'))
+      ->setDescription(new TranslatableMarkup('Internal field to store scrape to field configuration data.'))
+      ->setDefaultValue('')
+      ->setDisplayConfigurable('form', FALSE)
+      ->setDisplayConfigurable('view', FALSE)
+      ->setDisplayOptions('form', [
+        'region' => 'hidden',
+      ])
+      ->setDisplayOptions('view', [
+        'region' => 'hidden',
+      ]);
 
     return $fields;
   }

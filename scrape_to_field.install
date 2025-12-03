@@ -6,24 +6,33 @@
  */
 
 use Drupal\Core\Field\BaseFieldDefinition;
-use Drupal\Core\Field\FieldStorageDefinitionInterface;
 use Drupal\Core\StringTranslation\TranslatableMarkup;
 
 /**
  * Implements hook_install().
  */
 function scrape_to_field_install() {
-  $update_manager = \Drupal::entityDefinitionUpdateManager();
-
-  $scraper_config_field_definition = BaseFieldDefinition::create('string_long')
+  $field_definition = BaseFieldDefinition::create('string_long')
     ->setName('field_scraper_config')
     ->setLabel(new TranslatableMarkup('Scrape to field Configuration'))
     ->setDescription(new TranslatableMarkup('Internal field to store scrape to field configuration data.'))
     ->setDefaultValue('')
     ->setDisplayConfigurable('form', FALSE)
-    ->setDisplayConfigurable('view', FALSE);
+    ->setDisplayConfigurable('view', FALSE)
+    ->setDisplayOptions('form', [
+      'region' => 'hidden',
+    ])
+    ->setDisplayOptions('view', [
+      'region' => 'hidden',
+    ]);
 
-  $update_manager->installFieldStorageDefinition('field_scraper_config', 'node', 'scrape_to_field', $scraper_config_field_definition);
+  $entity_definition_update_manager = \Drupal::entityDefinitionUpdateManager();
+  $entity_definition_update_manager->installFieldStorageDefinition(
+    'field_scraper_config',
+    'node',
+    'scrape_to_field',
+    $field_definition
+  );
 }
 
 /**
@@ -34,24 +43,9 @@ function scrape_to_field_uninstall() {
   \Drupal::configFactory()->getEditable('scrape_to_field.settings')->delete();
   \Drupal::state()->delete('scrape_to_field.last_cron_run');
 
-  // Clear field data before uninstalling.
-  $query = \Drupal::entityQuery('node')
-    ->condition('field_scraper_config', NULL, 'IS NOT NULL')
-    ->accessCheck(TRUE);
-  $node_ids = $query->execute();
-
-  if (is_array($node_ids) && !empty($node_ids)) {
-    /** @var \Drupal\node\Entity\Node[] $nodes */
-    $nodes = \Drupal::entityTypeManager()->getStorage('node')->loadMultiple($node_ids);
-    foreach ($nodes as $node) {
-      $node->set('field_scraper_config', NULL);
-      $node->save();
-    }
-  }
-
-  // Uninstall the base field.
-  $scraper_config_field_definition = \Drupal::entityDefinitionUpdateManager()->getFieldStorageDefinition('field_scraper_config', 'node');
-  if ($scraper_config_field_definition instanceof FieldStorageDefinitionInterface) {
-    \Drupal::entityDefinitionUpdateManager()->uninstallFieldStorageDefinition($scraper_config_field_definition);
-  }
+  $connection = \Drupal::database();
+  $connection->delete('key_value')
+    ->condition('collection', 'state')
+    ->condition('name', 'scrape_to_field.%', 'LIKE')
+    ->execute();
 }

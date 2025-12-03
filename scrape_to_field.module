@@ -1,0 +1,117 @@
+<?php
+
+/**
+ * @file
+ * Primary module hooks for Scrape to field module.
+ */
+
+use Drupal\Core\Field\BaseFieldDefinition;
+use Drupal\Core\Field\FieldStorageDefinitionInterface;
+
+/**
+ * Implements hook_module_preuninstall().
+ *
+ * Uninstall the base field storage definition before the module is uninstalled.
+ * This prevents errors during entity definition cleanup.
+ */
+function scrape_to_field_module_preuninstall($module) {
+  if ($module !== 'scrape_to_field') {
+    return;
+  }
+
+  $database = Drupal::database();
+  $schema = $database->schema();
+
+  // First, clear any data from the field to prevent issues during uninstall.
+  // This must be done before we try to uninstall the field storage.
+  if ($schema->fieldExists('node_field_data', 'field_scraper_config')) {
+    $database->update('node_field_data')
+      ->fields(['field_scraper_config' => NULL])
+      ->isNotNull('field_scraper_config')
+      ->execute();
+  }
+  if ($schema->fieldExists('node_field_revision', 'field_scraper_config')) {
+    $database->update('node_field_revision')
+      ->fields(['field_scraper_config' => NULL])
+      ->isNotNull('field_scraper_config')
+      ->execute();
+  }
+
+  $columns_exist = $schema->fieldExists('node_field_data', 'field_scraper_config')
+    || $schema->fieldExists('node_field_revision', 'field_scraper_config');
+
+  $entity_definition_update_manager = Drupal::entityDefinitionUpdateManager();
+  $scraper_config_field_definition = $entity_definition_update_manager->getFieldStorageDefinition('field_scraper_config', 'node');
+
+  if ($scraper_config_field_definition instanceof FieldStorageDefinitionInterface && $columns_exist) {
+    try {
+      $entity_definition_update_manager->uninstallFieldStorageDefinition($scraper_config_field_definition);
+    }
+    catch (\Exception $e) {
+      // If uninstall fails, fall back to manual cleanup.
+      _scrape_to_field_manual_field_cleanup($schema, $columns_exist);
+    }
+  }
+  else {
+    // Either the definition or columns don't exist.
+    // Manually clean up any leftover data.
+    _scrape_to_field_manual_field_cleanup($schema, $columns_exist);
+  }
+
+  // Clean up any orphaned deleted field configs.
+  $state = Drupal::state();
+  $deleted = $state->get('field.field.deleted') ?? [];
+  $cleaned = [];
+  foreach ($deleted as $uuid => $field) {
+    $should_remove = FALSE;
+    if (is_object($field)) {
+      if (method_exists($field, 'getName') && $field->getName() === 'field_scraper_config') {
+        $should_remove = TRUE;
+      }
+      elseif ($field instanceof BaseFieldDefinition) {
+        $def = $field->toArray();
+        if (isset($def['field_name']) && $def['field_name'] === 'field_scraper_config') {
+          $should_remove = TRUE;
+        }
+      }
+    }
+    if (!$should_remove) {
+      $cleaned[$uuid] = $field;
+    }
+  }
+  if (count($cleaned) !== count($deleted)) {
+    $state->set('field.field.deleted', $cleaned);
+  }
+}
+
+/**
+ * Manually cleans up field storage when standard uninstall fails.
+ *
+ * @param \Drupal\Core\Database\Schema $schema
+ *   The database schema service.
+ * @param bool $columns_exist
+ *   Whether the database columns exist.
+ */
+function _scrape_to_field_manual_field_cleanup($schema, $columns_exist) {
+  // Drop columns if they exist.
+  if ($columns_exist) {
+    if ($schema->fieldExists('node_field_data', 'field_scraper_config')) {
+      $schema->dropField('node_field_data', 'field_scraper_config');
+    }
+    if ($schema->fieldExists('node_field_revision', 'field_scraper_config')) {
+      $schema->dropField('node_field_revision', 'field_scraper_config');
+    }
+  }
+
+  // Clean up key_value entries.
+  $key_value = Drupal::keyValue('entity.definitions.installed');
+  $definitions = $key_value->get('node.field_storage_definitions', []);
+  if (isset($definitions['field_scraper_config'])) {
+    unset($definitions['field_scraper_config']);
+    $key_value->set('node.field_storage_definitions', $definitions);
+  }
+
+  // Clean up schema data.
+  $schema_key_value = Drupal::keyValue('entity.storage_schema.sql');
+  $schema_key_value->delete('node.field_schema_data.field_scraper_config');
+}

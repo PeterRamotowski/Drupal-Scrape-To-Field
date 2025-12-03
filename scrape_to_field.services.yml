@@ -25,6 +25,16 @@ services:
   scrape_to_field.data_cleaning:
     class: Drupal\scrape_to_field\Service\DataCleaningService
 
+  scrape_to_field.hooks:
+    class: Drupal\scrape_to_field\Hook\Hooks
+    arguments: 
+      - '@config.factory'
+      - '@scrape_to_field.activity_logger'
+      - '@scrape_to_field.queue'
+      - '@keyvalue'
+    tags:
+      - { name: 'hook_event_subscriber' }
+
   logger.channel.scrape_to_field:
     parent: logger.channel_base
     arguments: ['scrape_to_field']
