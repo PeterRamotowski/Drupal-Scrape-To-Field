@@ -2,10 +2,12 @@
 
 namespace Drupal\scrape_to_field\Form;
 
-use Drupal\Component\Utility\Html;
+use Drupal\Component\Utility\Unicode;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
+use Drupal\Core\Field\FieldDefinitionInterface;
 use Drupal\Core\Form\FormBase;
 use Drupal\Core\Form\FormStateInterface;
+use Drupal\Core\Session\AccountProxyInterface;
 use Drupal\node\NodeInterface;
 use Drupal\scrape_to_field\DTO\NodeScraperConfigDto;
 use Drupal\scrape_to_field\DTO\ScraperFieldConfigDto;
@@ -40,13 +42,19 @@ class NodeScraperConfigForm extends FormBase {
   protected DataCleaningService $dataCleaningService;
 
   /**
+   * The current user.
+   */
+  protected AccountProxyInterface $currentUser;
+
+  /**
    * Constructs a NodeScraperConfigForm object.
    */
-  public function __construct(EntityTypeManagerInterface $entity_type_manager, WebScraperService $scraper_service, ScraperActivityLogger $scraper_logger, DataCleaningService $data_cleaning_service) {
+  public function __construct(EntityTypeManagerInterface $entity_type_manager, WebScraperService $scraper_service, ScraperActivityLogger $scraper_logger, DataCleaningService $data_cleaning_service, AccountProxyInterface $current_user) {
     $this->entityTypeManager = $entity_type_manager;
     $this->scraperService = $scraper_service;
     $this->scraperLogger = $scraper_logger;
     $this->dataCleaningService = $data_cleaning_service;
+    $this->currentUser = $current_user;
   }
 
   /**
@@ -58,6 +66,7 @@ class NodeScraperConfigForm extends FormBase {
       $container->get('scrape_to_field.scraper'),
       $container->get('scrape_to_field.activity_logger'),
       $container->get('scrape_to_field.data_cleaning'),
+      $container->get('current_user'),
     );
   }
 
@@ -86,15 +95,22 @@ class NodeScraperConfigForm extends FormBase {
 
     if (empty($scraper_fields)) {
       $form['no_fields'] = [
-        '#markup' => '<p>' . $this->t('No fields of supported types (string, text, integer, decimal, float) are available for web scraping on this content type.') . '</p>',
+        '#type' => 'html_tag',
+        '#tag' => 'p',
+        '#value' => $this->t('No fields of supported types (string, text, integer, decimal, float) are available for web scraping on this content type.'),
       ];
       return $form;
     }
 
     $form['description'] = [
-      '#markup' => '<p>' . $this->t('Configure web scraping sources for individual fields on this node: <strong>@title</strong>', [
-        '@title' => $node->getTitle(),
-      ]) . '</p>',
+      '#type' => 'container',
+      'text' => [
+        '#type' => 'html_tag',
+        '#tag' => 'p',
+        '#value' => $this->t('Configure web scraping sources for individual fields on this node: @title', [
+          '@title' => $node->getTitle(),
+        ]),
+      ],
     ];
 
     // Global settings section.
@@ -185,8 +201,9 @@ class NodeScraperConfigForm extends FormBase {
       '#type' => 'url',
       '#title' => $this->t('Source URL'),
       '#default_value' => $field_config['url'] ?? '',
-      '#description' => $this->t('The URL to scrape data from.'),
+      '#description' => $this->t('The public HTTPS URL to scrape data from.'),
       '#states' => $states_required,
+      '#maxlength' => 2048,
     ];
 
     $form['source_config']['selector_type'] = [
@@ -205,6 +222,7 @@ class NodeScraperConfigForm extends FormBase {
       '#title' => $this->t('CSS selector or XPath expression to extract data'),
       '#default_value' => $field_config['selector'] ?? '',
       '#states' => $states_required,
+      '#maxlength' => 500,
     ];
 
     $form['source_config']['css_description'] = [
@@ -300,6 +318,7 @@ class NodeScraperConfigForm extends FormBase {
       '#default_value' => trim($operations_text),
       '#description' => $this->t('Enter search and replace operations, one per line.<br/>Format: <strong>search_text|replace_text</strong>.<br/>Leave replace_text empty to remove the search text.<br/>Operations are applied in order.<br/>Examples:<br/><pre>$|<br/>$|USD<br/>Price:|<br/>.00|<br/>kg|kilograms</pre>'),
       '#rows' => 5,
+      '#maxlength' => 4096,
       '#states' => $cleaning_states_visible,
     ];
 
@@ -335,11 +354,17 @@ class NodeScraperConfigForm extends FormBase {
     }
 
     if (in_array($field_type, ['text', 'text_long'])) {
+      $text_formats = $this->getAvailableTextFormats($field_definition);
+      $default_format = $field_config['text_format'] ?? 'plain_text';
+      if (!isset($text_formats[$default_format])) {
+        $default_format = isset($text_formats['plain_text']) ? 'plain_text' : (array_key_first($text_formats) ?? '');
+      }
+
       $form['extraction_config']['text_format'] = [
         '#type' => 'select',
         '#title' => $this->t('Text format'),
-        '#options' => $this->getAvailableTextFormats(),
-        '#default_value' => $field_config['text_format'] ?? 'plain_text',
+        '#options' => $text_formats,
+        '#default_value' => $default_format,
         '#states' => $states_visible,
       ];
     }
@@ -369,7 +394,13 @@ class NodeScraperConfigForm extends FormBase {
     $form['test_config']['result'] = [
       '#type' => 'container',
       '#attributes' => ['id' => 'test-result-' . $field_name],
-      '#markup' => '<div class="messages messages--info">Click the button above to see results here.</div>',
+      'message' => [
+        '#type' => 'container',
+        '#attributes' => ['class' => ['messages', 'messages--info']],
+        'text' => [
+          '#plain_text' => $this->t('Click the button above to see results here.'),
+        ],
+      ],
     ];
 
     // Advanced options.
@@ -413,7 +444,7 @@ class NodeScraperConfigForm extends FormBase {
     ];
 
     if (!$field_name) {
-      $result['#markup'] = '<div class="messages messages--error">Could not determine field name for testing.</div>';
+      $result['message'] = $this->buildTestMessage('error', $this->t('Could not determine field name for testing.'));
       return $result;
     }
 
@@ -421,7 +452,17 @@ class NodeScraperConfigForm extends FormBase {
     $node = $form_state->get('node');
 
     if (empty($field_values['enabled']) || empty($field_values['source_config']['url']) || empty($field_values['source_config']['selector'])) {
-      $result['#markup'] = '<div class="messages messages--error">' . $this->t('Please fill in URL and selector fields.') . '</div>';
+      $result['message'] = $this->buildTestMessage('error', $this->t('Please fill in URL and selector fields.'));
+      return $result;
+    }
+
+    $validation = $this->scraperService->validateScrapeConfigSyntax(
+      $field_values['source_config']['url'],
+      $field_values['source_config']['selector'],
+      $field_values['source_config']['selector_type'] ?? 'css'
+    );
+    if (!$validation['valid']) {
+      $result['message'] = $this->buildTestMessage('error', $validation['message']);
       return $result;
     }
 
@@ -436,7 +477,10 @@ class NodeScraperConfigForm extends FormBase {
       $field_values['source_config']['url'],
       $field_values['source_config']['selector'],
       $field_values['source_config']['selector_type'] ?? 'css',
-      $extraction_config
+      $extraction_config + [
+        'timeout' => 10,
+        'test_mode' => TRUE,
+      ]
     );
 
     $success = $test_result !== NULL;
@@ -449,27 +493,40 @@ class NodeScraperConfigForm extends FormBase {
     }
 
     if (!$success) {
-      $result['#markup'] = '<div class="messages messages--error">' . $this->t('Test failed. Please check the URL and selector.') . '</div>';
+      $result['message'] = $this->buildTestMessage('error', $this->t('Test failed. Please check the URL and selector.'));
       return $result;
     }
 
     $sample_data_limit = 5;
     $sample_data = array_slice($test_result, 0, $sample_data_limit);
+    $items = array_map(static fn($item): string => Unicode::truncate((string) $item, 100, TRUE, TRUE), $sample_data);
 
-    $output = '<div class="messages messages--status">';
-    $output .= '<strong>' . $this->t('Test successful!') . '</strong><br/>';
-    $output .= $this->t('Found @count results. Sample data:', ['@count' => $result_count]) . '<br/>';
-    $output .= '<ul>';
-    foreach ($sample_data as $item) {
-      $output .= '<li>' . Html::escape(substr($item, 0, 100)) . ($item && strlen($item) > 100 ? '...' : '') . '</li>';
-    }
-    $output .= '</ul>';
+    $result['message'] = [
+      '#type' => 'container',
+      '#attributes' => ['class' => ['messages', 'messages--status']],
+      'title' => [
+        '#type' => 'html_tag',
+        '#tag' => 'strong',
+        '#value' => $this->t('Test successful!'),
+      ],
+      'summary' => [
+        '#type' => 'html_tag',
+        '#tag' => 'p',
+        '#value' => $this->t('Found @count results. Sample data:', ['@count' => $result_count]),
+      ],
+      'items' => [
+        '#theme' => 'item_list',
+        '#items' => $items,
+      ],
+    ];
+
     if ($result_count > $sample_data_limit) {
-      $output .= $this->t('... and @more more results.', ['@more' => $result_count - $sample_data_limit]);
+      $result['message']['more'] = [
+        '#type' => 'html_tag',
+        '#tag' => 'p',
+        '#value' => $this->t('... and @more more results.', ['@more' => $result_count - $sample_data_limit]),
+      ];
     }
-    $output .= '</div>';
-
-    $result['#markup'] = $output;
 
     return $result;
   }
@@ -509,19 +566,9 @@ class NodeScraperConfigForm extends FormBase {
           );
         }
 
-        // Validate URL format.
-        if (!empty($field_values['source_config']['url']) && !filter_var($field_values['source_config']['url'], FILTER_VALIDATE_URL)) {
-          $form_state->setErrorByName(
-            'field_' . $field_name . '][source_config][url',
-            $this->t('Please enter a valid URL for @field.', [
-              '@field' => $field_definition->getLabel(),
-            ])
-          );
-        }
-
         // Validate attribute field when extraction method is 'attribute'.
         if (
-          $field_values['extraction_config']['extract_method'] === 'attribute' &&
+          ($field_values['extraction_config']['extract_method'] ?? 'text') === 'attribute' &&
           empty($field_values['extraction_config']['attribute'])
         ) {
           $form_state->setErrorByName(
@@ -532,9 +579,9 @@ class NodeScraperConfigForm extends FormBase {
           );
         }
 
-        // Validate the scraper configuration using the scraper service.
+        // Validate the scraper configuration without making HTTP requests.
         if (!empty($field_values['source_config']['url']) && !empty($field_values['source_config']['selector'])) {
-          $validation = $this->scraperService->validateScrapeConfig(
+          $validation = $this->scraperService->validateScrapeConfigSyntax(
             $field_values['source_config']['url'],
             $field_values['source_config']['selector'],
             $field_values['source_config']['selector_type'] ?? 'css'
@@ -546,6 +593,19 @@ class NodeScraperConfigForm extends FormBase {
               $this->t('Scraper configuration error for @field: @message', [
                 '@field' => $field_definition->getLabel(),
                 '@message' => $validation['message'],
+              ])
+            );
+          }
+        }
+
+        if (isset($field_values['extraction_config']['text_format'])) {
+          $available_formats = $this->getAvailableTextFormats($field_definition);
+          $submitted_format = $field_values['extraction_config']['text_format'];
+          if (!isset($available_formats[$submitted_format])) {
+            $form_state->setErrorByName(
+              'field_' . $field_name . '][extraction_config][text_format',
+              $this->t('The selected text format is not available for @field.', [
+                '@field' => $field_definition->getLabel(),
               ])
             );
           }
@@ -592,7 +652,16 @@ class NodeScraperConfigForm extends FormBase {
     }
 
     $node_scraper_config = new NodeScraperConfigDto(TRUE, $scraper_field_configs);
-    $node->set('field_scraper_config', $node_scraper_config->toJson());
+    try {
+      $node->set('field_scraper_config', $node_scraper_config->toJson());
+    }
+    catch (\JsonException $exception) {
+      $this->messenger()->addError($this->t('Unable to save scraper configuration.'));
+      $this->scraperLogger->logInvalidConfiguration((int) $node->id(), $exception->getMessage());
+      $form_state->setRebuild();
+      return;
+    }
+
     $node->save();
 
     $this->scraperLogger->logConfigurationChange($node);
@@ -649,21 +718,49 @@ class NodeScraperConfigForm extends FormBase {
     $config_value = $config_field->first()->getValue();
     $json = $config_value['value'] ?? '[]';
 
-    return NodeScraperConfigDto::fromJson($json);
+    try {
+      return NodeScraperConfigDto::fromJson($json);
+    }
+    catch (\InvalidArgumentException $exception) {
+      $this->scraperLogger->logInvalidConfiguration((int) $node->id(), $exception->getMessage());
+      return NodeScraperConfigDto::disabled();
+    }
   }
 
   /**
    * Gets available text formats.
    */
-  protected function getAvailableTextFormats(): array {
+  protected function getAvailableTextFormats(?FieldDefinitionInterface $field_definition = NULL): array {
     $formats = [];
-    $text_formats = $this->entityTypeManager->getStorage('filter_format')->loadMultiple();
+    $text_formats = $this->entityTypeManager
+      ->getStorage('filter_format')
+      ->loadByProperties(['status' => TRUE]);
+    $allowed_formats = $field_definition?->getSetting('allowed_formats') ?: [];
 
     foreach ($text_formats as $format) {
-      $formats[$format->id()] = $format->label();
+      if (!empty($allowed_formats) && !in_array($format->id(), $allowed_formats, TRUE)) {
+        continue;
+      }
+
+      if ($format->access('use', $this->currentUser)) {
+        $formats[$format->id()] = $format->label();
+      }
     }
 
     return $formats;
+  }
+
+  /**
+   * Builds a test result message render array.
+   */
+  protected function buildTestMessage(string $type, $message): array {
+    return [
+      '#type' => 'container',
+      '#attributes' => ['class' => ['messages', 'messages--' . $type]],
+      'text' => [
+        '#plain_text' => (string) $message,
+      ],
+    ];
   }
 
   /**
