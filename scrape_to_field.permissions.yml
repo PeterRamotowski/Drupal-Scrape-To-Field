@@ -11,3 +11,4 @@ configure any node scrape to field:
 configure own node scrape to field:
   title: 'Configure own node scrape to field'
   description: 'Configure scrape to field settings for own nodes only'
+  restrict access: true
