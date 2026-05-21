@@ -65,7 +65,7 @@ class ScraperActivityLogger {
    */
   public function logInvalidUrl(string $url): void {
     $this->logger->error('Invalid URL provided to scrapeData: @url', [
-      '@url' => $url ?: 'empty',
+      '@url' => $this->redactUrl($url),
     ]);
   }
 
@@ -74,7 +74,7 @@ class ScraperActivityLogger {
    */
   public function logEmptySelector(string $url): void {
     $this->logger->error('Empty selector provided to scrapeData for URL: @url', [
-      '@url' => $url ?: 'empty',
+      '@url' => $this->redactUrl($url),
     ]);
   }
 
@@ -84,7 +84,7 @@ class ScraperActivityLogger {
   public function logInvalidSelectorType(string $selector_type, string $url): void {
     $this->logger->error('Invalid selector type "@type" provided to scrapeData for URL: @url', [
       '@type' => $selector_type ?: 'empty',
-      '@url' => $url ?: 'empty',
+      '@url' => $this->redactUrl($url),
     ]);
   }
 
@@ -94,7 +94,7 @@ class ScraperActivityLogger {
   public function logScrapingSuccess(string $url, int $count): void {
     $this->logger->info('Successfully scraped @count items from @url', [
       '@count' => $count,
-      '@url' => $url ?: 'empty',
+      '@url' => $this->redactUrl($url),
     ]);
   }
 
@@ -103,7 +103,7 @@ class ScraperActivityLogger {
    */
   public function logRequestFailure(string $url, ?string $error_message = NULL): void {
     $this->logger->error('Failed to scrape @url: @error', [
-      '@url' => $url ?: 'empty',
+      '@url' => $this->redactUrl($url),
       '@error' => $error_message ?: 'Unknown request error',
     ]);
   }
@@ -113,7 +113,7 @@ class ScraperActivityLogger {
    */
   public function logUnexpectedError(string $url, ?string $error_message = NULL): void {
     $this->logger->error('Unexpected error while scraping @url: @error', [
-      '@url' => $url ?: 'empty',
+      '@url' => $this->redactUrl($url),
       '@error' => $error_message ?: 'Unknown error',
     ]);
   }
@@ -143,6 +143,70 @@ class ScraperActivityLogger {
     $this->logger->info('Queued @count scraping jobs', [
       '@count' => $queued_count,
     ]);
+  }
+
+  /**
+   * Log invalid scraper configuration stored on a node.
+   */
+  public function logInvalidConfiguration(int $node_id, string $reason): void {
+    $this->logger->error('Invalid scraper configuration for node @nid: @reason', [
+      '@nid' => $node_id,
+      '@reason' => $reason,
+    ]);
+  }
+
+  /**
+   * Log invalid queue payloads.
+   */
+  public function logInvalidQueuePayload(mixed $payload): void {
+    $this->logger->warning('Invalid scrape queue payload: @payload', [
+      '@payload' => $this->summarizePayload($payload),
+    ]);
+  }
+
+  /**
+   * Log entity validation failures before scraped data is saved.
+   */
+  public function logValidationFailure(NodeInterface $node, string $reason): void {
+    $this->logger->error('Scraped data failed validation for node @nid: @reason', [
+      '@nid' => $node->id() ?? 'unsaved',
+      '@reason' => $reason,
+    ]);
+  }
+
+  /**
+   * Redacts query strings, fragments, and credentials from URLs.
+   */
+  protected function redactUrl(string $url): string {
+    if ($url === '') {
+      return 'empty';
+    }
+
+    $parts = parse_url($url);
+    if ($parts === FALSE || empty($parts['host'])) {
+      return 'invalid-url';
+    }
+
+    $scheme = $parts['scheme'] ?? 'https';
+    $host = $parts['host'];
+    $port = isset($parts['port']) ? ':' . $parts['port'] : '';
+    $path = $parts['path'] ?? '';
+
+    return $scheme . '://' . $host . $port . $path;
+  }
+
+  /**
+   * Summarizes a queue payload without risking very large log entries.
+   */
+  protected function summarizePayload(mixed $payload): string {
+    try {
+      $summary = json_encode($payload, JSON_THROW_ON_ERROR);
+    }
+    catch (\JsonException) {
+      $summary = get_debug_type($payload);
+    }
+
+    return substr($summary, 0, 500);
   }
 
 }
