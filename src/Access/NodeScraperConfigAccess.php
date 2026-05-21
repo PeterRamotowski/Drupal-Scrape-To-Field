@@ -27,25 +27,18 @@ class NodeScraperConfigAccess implements AccessInterface {
    *   The access result.
    */
   public function access(AccountInterface $account, Route $route, NodeInterface $node) {
-    // Global admin permission allows access to any node.
-    if ($account->hasPermission('configure any node scrape to field')) {
-      return AccessResult::allowedIfHasPermission($account, 'configure any node scrape to field')
-        ->addCacheContexts(['user.permissions'])
-        ->addCacheTags(['node:' . $node->id()]);
-    }
+    $update_access = $node->access('update', $account, TRUE);
 
-    // Check if user can configure own nodes and owns this node.
-    if ($account->hasPermission('configure own node scrape to field')) {
-      $is_owner = $node->getOwnerId() == $account->id();
-      return AccessResult::allowedIf($is_owner)
-        ->addCacheContexts(['user.permissions', 'user'])
-        ->addCacheTags(['node:' . $node->id()]);
-    }
+    $any_access = AccessResult::allowedIfHasPermission($account, 'configure any node scrape to field');
+    $own_access = AccessResult::allowedIfHasPermission($account, 'configure own node scrape to field')
+      ->andIf(AccessResult::allowedIf((int) $node->getOwnerId() === (int) $account->id()))
+      ->cachePerUser();
 
-    // No access granted.
-    return AccessResult::forbidden()
-      ->addCacheContexts(['user.permissions'])
-      ->addCacheTags(['node:' . $node->id()]);
+    return $any_access
+      ->orIf($own_access)
+      ->andIf($update_access)
+      ->addCacheableDependency($node)
+      ->cachePerPermissions();
   }
 
 }
