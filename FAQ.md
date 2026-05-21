@@ -40,9 +40,9 @@ publicly accessible content only. For authenticated content, consider using API
 integrations instead.
 
 **Q: What happens if a website blocks my scraping?**
-A: The module includes User-Agent rotation and respects rate limiting through
-configurable frequencies. If you're still blocked, try reducing your scraping
-frequency or contact the website owner about their scraping policy.
+A: The module includes User-Agent rotation, configurable scraping frequencies,
+and conservative per-host request pacing. If you're still blocked, reduce your
+scraping frequency or contact the website owner about their scraping policy.
 
 ## Troubleshooting
 

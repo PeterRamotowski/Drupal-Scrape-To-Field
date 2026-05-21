@@ -45,6 +45,10 @@ module settings:
 - Request Timeout
 - Cron scraping frequency
 - Allowed HTML tags
+- Maximum HTTP response size
+- Maximum selector matches
+- Optional allowed source domains
+- Retry and per-host pacing settings
 
 ### Field-Level Configuration
 
@@ -72,6 +76,40 @@ Configure access control under **People » Permissions**:
 - **Configure any node scrape to field**: Configure scraping for any node
 - **Configure own node scrape to field**: Configure scraping only for own
 authored nodes
+
+
+## Security and Validation Policy
+
+Scraping target URLs are validated before saving configuration and again before
+each outbound request. The service accepts public `https://` URLs only, rejects
+URLs with embedded credentials, blocks localhost and private, reserved,
+loopback, link-local, multicast, and cloud metadata address ranges after DNS
+resolution, and validates every redirect target with the same policy. Plain
+HTTP and globally disabled TLS certificate verification are not supported.
+
+Administrators may optionally configure an allowed source domain list. When set,
+scraping is restricted to those domains and their subdomains. Query strings and
+fragments are redacted from logs to reduce accidental credential disclosure.
+
+Field configuration validation rules:
+
+- Source URL: public `https://` URL only, maximum 2048 characters.
+- Selector type: `css` or `xpath`.
+- Selector: required when scraping is enabled, maximum 500 characters.
+- Extract method: `text`, `html`, or `attribute`.
+- Text format: only formats the configuring user can use are available.
+- Cleaning operations: maximum 4096 characters, 25 operations, and 256
+  characters per operation line.
+- Allowed HTML tags: comma-separated safe tag names. Structural or active tags
+  such as `script`, `style`, `form`, `iframe`, `object`, and `embed` are never
+  stored in the allowlist.
+- Response body: maximum 1 MiB by default, configurable from 1024 bytes to
+  10 MiB.
+- Selector matches: maximum 50 by default, configurable from 1 to 500.
+- Stored content: maximum 65,535 characters by default.
+
+The configuration form validates syntax and policy only. The explicit
+**Test this configuration** button performs a live fetch with a shorter timeout.
 
 
 ## Troubleshooting and FAQ
