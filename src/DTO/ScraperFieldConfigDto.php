@@ -99,6 +99,9 @@ class ScraperFieldConfigDto {
       elseif (!filter_var($this->url, FILTER_VALIDATE_URL)) {
         $errors[] = 'URL must be a valid URL.';
       }
+      elseif (strtolower(parse_url($this->url, PHP_URL_SCHEME) ?: '') !== 'https') {
+        $errors[] = 'URL must use the https scheme.';
+      }
 
       if (empty($this->selector)) {
         $errors[] = 'Selector is required when scraping is enabled.';

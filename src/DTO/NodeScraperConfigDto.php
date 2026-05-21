@@ -37,9 +37,22 @@ class NodeScraperConfigDto {
 
   /**
    * Creates a DTO from JSON string.
+   *
+   * @throws \InvalidArgumentException
+   *   Thrown when the JSON cannot be decoded.
    */
   public static function fromJson(string $json, bool $scrapingEnabled = TRUE): self {
-    $config = json_decode($json, TRUE) ?: [];
+    try {
+      $config = json_decode($json, TRUE, 512, JSON_THROW_ON_ERROR);
+    }
+    catch (\JsonException $exception) {
+      throw new \InvalidArgumentException('Invalid scraper configuration JSON.', 0, $exception);
+    }
+
+    if (!is_array($config)) {
+      throw new \InvalidArgumentException('Scraper configuration JSON must decode to an array.');
+    }
+
     return self::fromArray($config, $scrapingEnabled);
   }
 
@@ -58,9 +71,12 @@ class NodeScraperConfigDto {
 
   /**
    * Converts DTO to JSON string.
+   *
+   * @throws \JsonException
+   *   Thrown when the configuration cannot be encoded.
    */
   public function toJson(): string {
-    return json_encode($this->toArray());
+    return json_encode($this->toArray(), JSON_THROW_ON_ERROR);
   }
 
   /**
