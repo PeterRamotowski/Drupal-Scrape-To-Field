@@ -7,6 +7,8 @@ use Drupal\scrape_to_field\Service\WebScraperService;
 use Drupal\scrape_to_field\Service\UserAgentService;
 use Drupal\scrape_to_field\Service\ScraperActivityLogger;
 use Drupal\scrape_to_field\Service\DataCleaningService;
+use Drupal\scrape_to_field\Service\ScrapeRateLimiter;
+use Drupal\scrape_to_field\Service\TargetUrlPolicy;
 use Drupal\Core\Config\ConfigFactoryInterface;
 use Drupal\Core\Config\Config;
 use PHPUnit\Framework\TestCase;
@@ -70,6 +72,20 @@ class WebScraperServiceTest extends TestCase {
   protected DataCleaningService|MockObject $dataCleaningService;
 
   /**
+   * Mock target URL policy.
+   *
+   * @var \Drupal\scrape_to_field\Service\TargetUrlPolicy|\PHPUnit\Framework\MockObject\MockObject
+   */
+  protected TargetUrlPolicy|MockObject $targetUrlPolicy;
+
+  /**
+   * Mock scrape rate limiter.
+   *
+   * @var \Drupal\scrape_to_field\Service\ScrapeRateLimiter|\PHPUnit\Framework\MockObject\MockObject
+   */
+  protected ScrapeRateLimiter|MockObject $rateLimiter;
+
+  /**
    * {@inheritdoc}
    */
   protected function setUp(): void {
@@ -81,6 +97,8 @@ class WebScraperServiceTest extends TestCase {
     $this->userAgentService = $this->createMock(UserAgentService::class);
     $this->scraperLogger = $this->createMock(ScraperActivityLogger::class);
     $this->dataCleaningService = $this->createMock(DataCleaningService::class);
+    $this->targetUrlPolicy = $this->createMock(TargetUrlPolicy::class);
+    $this->rateLimiter = $this->createMock(ScrapeRateLimiter::class);
 
     $this->configFactory
       ->method('get')
@@ -91,9 +109,11 @@ class WebScraperServiceTest extends TestCase {
       ->method('get')
       ->willReturnMap([
         ['timeout', 30],
-        ['max_retries', 3],
-        ['retry_delay', 2],
+        ['max_retries', 0],
+        ['retry_delay', 0],
         ['user_agent_rotation', TRUE],
+        ['max_response_bytes', 1048576],
+        ['max_results', 50],
       ]);
 
     $this->userAgentService
@@ -104,12 +124,30 @@ class WebScraperServiceTest extends TestCase {
       ->method('applyCleaningOperations')
       ->willReturnArgument(0);
 
+    $this->targetUrlPolicy
+      ->method('assertAllowed')
+      ->willReturnCallback(function (string $url): void {
+        if (!str_starts_with($url, 'https://')) {
+          throw new \InvalidArgumentException('Only https:// URLs are permitted.');
+        }
+      });
+
+    $this->targetUrlPolicy
+      ->method('getHost')
+      ->willReturn('example.com');
+
+    $this->rateLimiter
+      ->method('claim')
+      ->willReturn(TRUE);
+
     $this->scraperService = new WebScraperService(
       $this->httpClient,
       $this->configFactory,
       $this->userAgentService,
       $this->scraperLogger,
-      $this->dataCleaningService
+      $this->dataCleaningService,
+      $this->targetUrlPolicy,
+      $this->rateLimiter
     );
   }
 
@@ -316,7 +354,9 @@ class WebScraperServiceTest extends TestCase {
       $this->configFactory,
       $this->userAgentService,
       $this->scraperLogger,
-      $this->dataCleaningService
+      $this->dataCleaningService,
+      $this->targetUrlPolicy,
+      $this->rateLimiter
     );
 
     $result = $scraperService->scrapeData(
@@ -345,6 +385,9 @@ class WebScraperServiceTest extends TestCase {
         'https://example.com/test',
         $this->callback(function ($options) {
           return $options['timeout'] === 30 &&
+                 $options['connect_timeout'] === 5 &&
+                 $options['verify'] === TRUE &&
+                 isset($options['allow_redirects']['on_redirect']) &&
                  $options['headers']['User-Agent'] === 'Test User Agent 1.0' &&
                  isset($options['headers']['Accept']);
         })
@@ -401,9 +444,7 @@ class WebScraperServiceTest extends TestCase {
       ['test_mode' => TRUE]
     );
 
-    // Should return empty array as JSON can't be parsed as HTML.
-    $this->assertIsArray($result);
-    $this->assertEmpty($result);
+    $this->assertNull($result);
   }
 
 }

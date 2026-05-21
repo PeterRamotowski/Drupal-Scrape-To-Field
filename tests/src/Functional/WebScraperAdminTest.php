@@ -109,9 +109,11 @@ class WebScraperAdminTest extends BrowserTestBase {
     $this->drupalGet('/admin/config/content/web-scraper');
 
     $this->assertSession()->fieldExists('timeout');
-    $this->assertSession()->fieldExists('verify_ssl');
     $this->assertSession()->fieldExists('enable_cron');
     $this->assertSession()->fieldExists('cron_frequency');
+    $this->assertSession()->fieldExists('max_response_bytes');
+    $this->assertSession()->fieldExists('max_results');
+    $this->assertSession()->fieldExists('max_retries');
   }
 
   /**

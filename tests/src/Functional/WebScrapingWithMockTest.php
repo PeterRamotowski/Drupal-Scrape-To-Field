@@ -49,6 +49,10 @@ class WebScrapingWithMockTest extends BrowserTestBase {
     $this->createFieldWithStorage('field_scraped_content', 'text_long', 'test_article');
     $this->createFieldWithStorage('field_scraped_author', 'string', 'test_article');
     $this->createFieldWithStorage('field_scraped_date', 'string', 'test_article');
+
+    $this->config('scrape_to_field.settings')
+      ->set('host_rate_limit_interval', 0)
+      ->save();
   }
 
   /**
@@ -398,7 +402,9 @@ class WebScrapingWithMockTest extends BrowserTestBase {
       $this->container->get('config.factory'),
       $this->container->get('scrape_to_field.user_agent'),
       $this->container->get('scrape_to_field.activity_logger'),
-      $this->container->get('scrape_to_field.data_cleaning')
+      $this->container->get('scrape_to_field.data_cleaning'),
+      $this->container->get('scrape_to_field.target_url_policy'),
+      $this->container->get('scrape_to_field.rate_limiter')
     );
     $this->container->set('scrape_to_field.scraper', $scraper_service);
 
@@ -408,7 +414,8 @@ class WebScrapingWithMockTest extends BrowserTestBase {
       $scraper_service,
       $this->container->get('scrape_to_field.activity_logger'),
       $this->container->get('scrape_to_field.content_sanitization'),
-      $this->container->get('state')
+      $this->container->get('state'),
+      $this->container->get('lock')
     );
     $this->container->set('scrape_to_field.manager', $manager);
   }

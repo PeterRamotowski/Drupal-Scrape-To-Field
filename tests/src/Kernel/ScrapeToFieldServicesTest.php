@@ -41,6 +41,12 @@ class ScrapeToFieldServicesTest extends KernelTestBase {
 
     $data_cleaning = $this->container->get('scrape_to_field.data_cleaning');
     $this->assertInstanceOf('Drupal\scrape_to_field\Service\DataCleaningService', $data_cleaning);
+
+    $target_url_policy = $this->container->get('scrape_to_field.target_url_policy');
+    $this->assertInstanceOf('Drupal\scrape_to_field\Service\TargetUrlPolicy', $target_url_policy);
+
+    $rate_limiter = $this->container->get('scrape_to_field.rate_limiter');
+    $this->assertInstanceOf('Drupal\scrape_to_field\Service\ScrapeRateLimiter', $rate_limiter);
   }
 
   /**
@@ -138,10 +144,12 @@ class ScrapeToFieldServicesTest extends KernelTestBase {
     $timeout = $config->get('timeout');
     $max_retries = $config->get('max_retries');
     $retry_delay = $config->get('retry_delay');
+    $max_response_bytes = $config->get('max_response_bytes');
 
     $this->assertTrue($timeout === NULL || is_numeric($timeout));
     $this->assertTrue($max_retries === NULL || is_numeric($max_retries));
     $this->assertTrue($retry_delay === NULL || is_numeric($retry_delay));
+    $this->assertTrue($max_response_bytes === NULL || is_numeric($max_response_bytes));
   }
 
   /**
