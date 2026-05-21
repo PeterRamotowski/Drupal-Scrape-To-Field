@@ -1,0 +1,11 @@
+timeout: 30
+enable_cron: true
+cron_frequency: 21600
+max_content_length: 65535
+allowed_html_tags: 'p,br,strong,em,ul,ol,li,h1,h2,h3,h4,h5,h6,a,img,blockquote,div,span'
+max_response_bytes: 1048576
+max_results: 50
+allowed_domains: ''
+max_retries: 2
+retry_delay: 1
+host_rate_limit_interval: 1

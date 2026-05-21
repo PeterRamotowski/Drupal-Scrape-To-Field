@@ -1,0 +1,37 @@
+scrape_to_field.settings:
+  type: config_object
+  label: 'Scrape to field settings'
+  mapping:
+    timeout:
+      type: integer
+      label: 'Request timeout'
+    enable_cron:
+      type: boolean
+      label: 'Enable cron scraping'
+    cron_frequency:
+      type: integer
+      label: 'Cron frequency'
+    max_content_length:
+      type: integer
+      label: 'Maximum content length'
+    allowed_html_tags:
+      type: string
+      label: 'Allowed HTML tags'
+    max_response_bytes:
+      type: integer
+      label: 'Maximum response size'
+    max_results:
+      type: integer
+      label: 'Maximum selector matches'
+    allowed_domains:
+      type: string
+      label: 'Allowed source domains'
+    max_retries:
+      type: integer
+      label: 'Maximum retries'
+    retry_delay:
+      type: integer
+      label: 'Initial retry delay'
+    host_rate_limit_interval:
+      type: integer
+      label: 'Per-host request interval'
