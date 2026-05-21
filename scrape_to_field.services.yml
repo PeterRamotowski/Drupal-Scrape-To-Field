@@ -5,7 +5,7 @@ services:
 
   scrape_to_field.manager:
     class: Drupal\scrape_to_field\Service\ScrapeFieldManager
-    arguments: ['@entity_type.manager', '@scrape_to_field.scraper', '@scrape_to_field.activity_logger', '@scrape_to_field.content_sanitization', '@state']
+    arguments: ['@entity_type.manager', '@scrape_to_field.scraper', '@scrape_to_field.activity_logger', '@scrape_to_field.content_sanitization', '@state', '@lock']
 
   scrape_to_field.queue:
     class: Drupal\scrape_to_field\Service\QueueManager
