@@ -1,7 +1,7 @@
 services:
   scrape_to_field.scraper:
     class: Drupal\scrape_to_field\Service\WebScraperService
-    arguments: ['@http_client', '@config.factory', '@scrape_to_field.user_agent', '@scrape_to_field.activity_logger', '@scrape_to_field.data_cleaning']
+    arguments: ['@http_client', '@config.factory', '@scrape_to_field.user_agent', '@scrape_to_field.activity_logger', '@scrape_to_field.data_cleaning', '@scrape_to_field.target_url_policy', '@scrape_to_field.rate_limiter']
 
   scrape_to_field.manager:
     class: Drupal\scrape_to_field\Service\ScrapeFieldManager
@@ -24,6 +24,14 @@ services:
 
   scrape_to_field.data_cleaning:
     class: Drupal\scrape_to_field\Service\DataCleaningService
+
+  scrape_to_field.target_url_policy:
+    class: Drupal\scrape_to_field\Service\TargetUrlPolicy
+    arguments: ['@config.factory']
+
+  scrape_to_field.rate_limiter:
+    class: Drupal\scrape_to_field\Service\ScrapeRateLimiter
+    arguments: ['@state', '@datetime.time', '@config.factory']
 
   scrape_to_field.hooks:
     class: Drupal\scrape_to_field\Hook\Hooks
