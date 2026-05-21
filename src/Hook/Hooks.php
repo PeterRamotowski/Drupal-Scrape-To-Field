@@ -11,6 +11,7 @@ use Drupal\Core\KeyValueStore\KeyValueFactoryInterface;
 use Drupal\Core\StringTranslation\StringTranslationTrait;
 use Drupal\Core\StringTranslation\TranslatableMarkup;
 use Drupal\Core\Url;
+use Drupal\node\NodeInterface;
 use Drupal\scrape_to_field\Service\QueueManager;
 use Drupal\scrape_to_field\Service\ScraperActivityLogger;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
@@ -18,7 +19,7 @@ use Symfony\Component\DependencyInjection\Attribute\Autowire;
 /**
  * Hook implementations for scrape_to_field module.
  */
-class Hooks {
+final class Hooks {
 
   use StringTranslationTrait;
 
@@ -90,12 +91,18 @@ class Hooks {
   public function scraperEntityOperation(EntityInterface $entity) {
     $operations = [];
 
-    if ($entity->getEntityTypeId() === 'node') {
+    if ($entity instanceof NodeInterface) {
+      $url = Url::fromRoute('scrape_to_field.node_scraper_config', [
+        'node' => $entity->id(),
+      ]);
+
+      if (!$url->access()) {
+        return $operations;
+      }
+
       $operations['scraper_config'] = [
         'title' => $this->t('Scraper configuration'),
-        'url' => Url::fromRoute('scrape_to_field.node_scraper_config', [
-          'node' => $entity->id(),
-        ]),
+        'url' => $url,
         'weight' => 50,
       ];
     }
