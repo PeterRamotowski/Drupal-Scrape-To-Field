@@ -6,5 +6,3 @@ configure: scrape_to_field.admin_config
 core_version_requirement: ^11
 dependencies:
   - drupal:field
-  - drupal:automated_cron
-  - drupal:dblog
