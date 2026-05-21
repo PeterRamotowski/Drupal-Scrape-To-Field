@@ -12,6 +12,32 @@ use Drupal\Core\Config\ConfigFactoryInterface;
 class ContentSanitizationService {
 
   /**
+   * Default HTML tags allowed in scraped HTML field values.
+   */
+  private const DEFAULT_ALLOWED_HTML_TAGS = 'p,br,strong,em,ul,ol,li,h1,h2,h3,h4,h5,h6,a,img,blockquote,div,span';
+
+  /**
+   * HTML tags that are never allowed in scraped content.
+   */
+  private const DISALLOWED_HTML_TAGS = [
+    'script',
+    'style',
+    'link',
+    'meta',
+    'form',
+    'input',
+    'textarea',
+    'select',
+    'option',
+    'button',
+    'object',
+    'embed',
+    'applet',
+    'iframe',
+    'base',
+  ];
+
+  /**
    * The config factory.
    */
   protected ConfigFactoryInterface $configFactory;
@@ -21,6 +47,13 @@ class ContentSanitizationService {
    */
   public function __construct(ConfigFactoryInterface $config_factory) {
     $this->configFactory = $config_factory;
+  }
+
+  /**
+   * Gets the default HTML tag list allowed for scraped HTML values.
+   */
+  public function getDefaultAllowedHtmlTags(): string {
+    return self::DEFAULT_ALLOWED_HTML_TAGS;
   }
 
   /**
@@ -98,14 +131,11 @@ class ContentSanitizationService {
    *   The sanitized HTML content.
    */
   protected function sanitizeHtmlContent(string $content, $security_config): string {
-    $allowed_tags_str = $security_config->get('allowed_html_tags') ?: 'p,br,strong,em,ul,ol,li,h1,h2,h3,h4,h5,h6,a,img,blockquote,div,span';
-    $allowed_tags = array_map('trim', explode(',', $allowed_tags_str));
+    $allowed_tags = $this->normalizeAllowedTags(
+      $security_config->get('allowed_html_tags') ?: $this->getDefaultAllowedHtmlTags()
+    );
 
-    $content = Xss::filter($content, $allowed_tags);
-
-    $content = $this->removeDangerousHtml($content);
-
-    return $content;
+    return Xss::filter($content, $allowed_tags);
   }
 
   /**
@@ -126,7 +156,7 @@ class ContentSanitizationService {
       return $this->sanitizeUrl($content);
     }
 
-    return Html::escape($content);
+    return $this->sanitizePlainTextContent($content);
   }
 
   /**
@@ -139,57 +169,14 @@ class ContentSanitizationService {
    *   The sanitized text content.
    */
   protected function sanitizeTextContent(string $content): string {
-    return Html::escape($content);
+    return $this->sanitizePlainTextContent($content);
   }
 
   /**
-   * Removes dangerous and non-content HTML elements and attributes.
-   *
-   * @param string $content
-   *   The HTML content to process.
-   *
-   * @return string
-   *   The content with dangerous and structural elements removed.
+   * Sanitizes plain text content extracted from text or attributes.
    */
-  protected function removeDangerousHtml(string $content): string {
-    // Remove script tags.
-    $content = preg_replace('/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/mi', '', $content);
-
-    // Remove style tags.
-    $content = preg_replace('/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/mi', '', $content);
-
-    // Remove link tags.
-    $content = preg_replace('/<link\b[^>]*\/?>/mi', '', $content);
-
-    // Remove meta tags.
-    $content = preg_replace('/<meta\b[^>]*\/?>/mi', '', $content);
-
-    // Remove noscript tags.
-    $content = preg_replace('/<noscript\b[^<]*(?:(?!<\/noscript>)<[^<]*)*<\/noscript>/mi', '', $content);
-
-    // Remove JavaScript event handlers.
-    $content = preg_replace('/\son\w+\s*=\s*["\'][^"\']*["\']/i', '', $content);
-
-    // Remove all style attributes.
-    $content = preg_replace('/\bstyle\s*=\s*["\'][^"\']*["\']/i', '', $content);
-
-    // Replace dangerous URL protocols.
-    $content = preg_replace('/\bhref\s*=\s*["\']javascript:/i', 'href="#"', $content);
-    $content = preg_replace('/\bsrc\s*=\s*["\']data:/i', 'src="#"', $content);
-    $content = preg_replace('/\bsrc\s*=\s*["\']vbscript:/i', 'src="#"', $content);
-
-    // Remove form-related tags.
-    $content = preg_replace('/<(?:form|input|textarea|select|option|button)\b[^>]*\/?>/mi', '', $content);
-    $content = preg_replace('/<\/(?:form|textarea|select)>/mi', '', $content);
-
-    // Remove object and embed tags (can contain dangerous content)
-    $content = preg_replace('/<(?:object|embed|applet)\b[^<]*(?:(?!<\/(?:object|embed|applet)>)<[^<]*)*<\/(?:object|embed|applet)>/mi', '', $content);
-    $content = preg_replace('/<(?:object|embed|applet)\b[^>]*\/?>/mi', '', $content);
-
-    // Remove iframe tags (can contain external malicious content)
-    $content = preg_replace('/<iframe\b[^<]*(?:(?!<\/iframe>)<[^<]*)*<\/iframe>/mi', '', $content);
-
-    return $content;
+  protected function sanitizePlainTextContent(string $content): string {
+    return trim(strip_tags(Html::decodeEntities($content)));
   }
 
   /**
@@ -225,13 +212,13 @@ class ContentSanitizationService {
     if (!filter_var($url, FILTER_VALIDATE_URL)) {
       // Check if it's a valid relative path.
       if (preg_match('/^[\/\w\-\._~:\/?#\[\]@!$&\'()*+,;=]+$/', $url)) {
-        return Html::escape($url);
+        return $url;
       }
 
       return '#';
     }
 
-    return Html::escape($url);
+    return $url;
   }
 
   /**
@@ -257,6 +244,27 @@ class ContentSanitizationService {
     }
 
     return $content;
+  }
+
+  /**
+   * Normalizes configured HTML tag names.
+   *
+   * @return string[]
+   *   Safe tag names accepted by Drupal's XSS filter.
+   */
+  public function normalizeAllowedTags(string $tags): array {
+    $allowed_tags = [];
+    foreach (explode(',', strtolower($tags)) as $tag) {
+      $tag = trim($tag);
+      if ($tag !== ''
+        && preg_match('/^[a-z][a-z0-9-]*$/', $tag)
+        && !in_array($tag, self::DISALLOWED_HTML_TAGS, TRUE)
+      ) {
+        $allowed_tags[] = $tag;
+      }
+    }
+
+    return array_values(array_unique($allowed_tags));
   }
 
 }
