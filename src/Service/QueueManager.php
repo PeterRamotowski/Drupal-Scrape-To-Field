@@ -72,35 +72,44 @@ class QueueManager {
       ->condition('status', 1)
       ->exists('field_scraper_config');
 
-    $nids = $query->execute();
+    $nids = array_values($query
+      ->range(0, 250)
+      ->execute());
 
-    foreach ($nids as $nid) {
-      $node = $node_storage->load($nid);
-      if (!$node || !$this->scrapeFieldManager->hasScraperConfig($node)) {
-        continue;
-      }
+    foreach (array_chunk($nids, 50) as $chunk) {
+      $nodes = $node_storage->loadMultiple($chunk);
 
-      $scraper_config = $this->scrapeFieldManager->getNodeScraperConfig($node);
-
-      foreach ($scraper_config as $field_name => $field_config) {
-        if (empty($field_config['enabled'])) {
+      foreach ($nodes as $node) {
+        if (!$node || !$this->scrapeFieldManager->hasScraperConfig($node)) {
           continue;
         }
 
-        // Determine the frequency for this field.
-        $field_frequency = !empty($field_config['frequency']) ? (int) $field_config['frequency'] : $global_frequency;
+        $scraper_config = $this->scrapeFieldManager->getNodeScraperConfig($node);
 
-        // Check if enough time has passed since last scrape for this field.
-        $last_scrape_key = "scrape_to_field.last_scrape.{$nid}.{$field_name}";
-        $last_scrape = $this->state->get($last_scrape_key, 0);
+        foreach ($scraper_config as $field_name => $field_config) {
+          if (empty($field_config['enabled'])) {
+            continue;
+          }
 
-        if (($current_time - $last_scrape) >= $field_frequency) {
-          $queue->createItem([
-            'node_id' => $nid,
-            'field_name' => $field_name,
-            'timestamp' => $current_time,
-          ]);
-          $queued++;
+          // Determine the frequency for this field.
+          $field_frequency = !empty($field_config['frequency']) ? (int) $field_config['frequency'] : $global_frequency;
+          $nid = (int) $node->id();
+
+          // Check last scrape and queued state to avoid duplicate backlog.
+          $last_scrape_key = "scrape_to_field.last_scrape.{$nid}.{$field_name}";
+          $last_queued_key = "scrape_to_field.queued.{$nid}.{$field_name}";
+          $last_scrape = (int) $this->state->get($last_scrape_key, 0);
+          $last_queued = (int) $this->state->get($last_queued_key, 0);
+
+          if (($current_time - max($last_scrape, $last_queued)) >= $field_frequency) {
+            $queue->createItem([
+              'node_id' => $nid,
+              'field_name' => $field_name,
+              'timestamp' => $current_time,
+            ]);
+            $this->state->set($last_queued_key, $current_time);
+            $queued++;
+          }
         }
       }
     }
