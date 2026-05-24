@@ -324,6 +324,10 @@ class WebScrapingFunctionalTest extends BrowserTestBase {
       else {
         $this->assertSession()->addressMatches('/\/node\/\d+$/');
 
+        $node = \Drupal::entityTypeManager()
+          ->getStorage('node')
+          ->loadUnchanged($node->id());
+
         $scraper_manager = \Drupal::service('scrape_to_field.manager');
         $config = $scraper_manager->getNodeScraperConfig($node);
 
