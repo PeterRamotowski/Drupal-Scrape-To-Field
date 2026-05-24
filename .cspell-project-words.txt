@@ -1,0 +1,4 @@
+# scrape_to_field module words
+localdomain
+retryable
+sslversion
