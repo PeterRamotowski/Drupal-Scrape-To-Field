@@ -1,7 +1,7 @@
 services:
   scrape_to_field.scraper:
     class: Drupal\scrape_to_field\Service\WebScraperService
-    arguments: ['@http_client', '@config.factory', '@scrape_to_field.user_agent', '@scrape_to_field.activity_logger', '@scrape_to_field.data_cleaning', '@scrape_to_field.target_url_policy', '@scrape_to_field.rate_limiter']
+    arguments: ['@scrape_to_field.http_client', '@scrape_to_field.dom_extractor', '@scrape_to_field.config_validator', '@scrape_to_field.activity_logger', '@scrape_to_field.data_cleaning']
 
   scrape_to_field.manager:
     class: Drupal\scrape_to_field\Service\ScrapeFieldManager
@@ -10,6 +10,18 @@ services:
   scrape_to_field.queue:
     class: Drupal\scrape_to_field\Service\QueueManager
     arguments: ['@entity_type.manager', '@queue', '@scrape_to_field.manager', '@scrape_to_field.activity_logger', '@config.factory', '@state']
+
+  scrape_to_field.http_client:
+    class: Drupal\scrape_to_field\Service\ScraperHttpClient
+    arguments: ['@http_client', '@config.factory', '@scrape_to_field.user_agent', '@scrape_to_field.target_url_policy', '@scrape_to_field.rate_limiter']
+
+  scrape_to_field.dom_extractor:
+    class: Drupal\scrape_to_field\Service\DomContentExtractor
+    arguments: ['@config.factory']
+
+  scrape_to_field.config_validator:
+    class: Drupal\scrape_to_field\Service\ScraperConfigValidator
+    arguments: ['@scrape_to_field.target_url_policy']
 
   scrape_to_field.content_sanitization:
     class: Drupal\scrape_to_field\Service\ContentSanitizationService
@@ -31,7 +43,7 @@ services:
 
   scrape_to_field.rate_limiter:
     class: Drupal\scrape_to_field\Service\ScrapeRateLimiter
-    arguments: ['@state', '@datetime.time', '@config.factory']
+    arguments: ['@state', '@datetime.time', '@config.factory', '@lock']
 
   scrape_to_field.hooks:
     class: Drupal\scrape_to_field\Hook\Hooks

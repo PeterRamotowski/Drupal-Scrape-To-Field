@@ -3,9 +3,11 @@
 namespace Drupal\scrape_to_field\Service;
 
 use Drupal\Component\Utility\Crypt;
+use Drupal\Core\Lock\LockBackendInterface;
 use Drupal\Core\Config\ConfigFactoryInterface;
 use Drupal\Core\State\StateInterface;
 use Drupal\Component\Datetime\TimeInterface;
+use Drupal\scrape_to_field\Exception\ScrapeRateLimitException;
 
 /**
  * Coordinates conservative per-host pacing for scrape requests.
@@ -19,10 +21,14 @@ class ScrapeRateLimiter {
     protected StateInterface $state,
     protected TimeInterface $time,
     protected ConfigFactoryInterface $configFactory,
+    protected LockBackendInterface $lockBackend,
   ) {}
 
   /**
-   * Attempts to claim the next request slot for a host.
+   * Claims the next request slot for a host.
+   *
+   * @throws \Drupal\scrape_to_field\Exception\ScrapeRateLimitException
+   *   Thrown when the caller must retry after a pacing delay.
    */
   public function claim(string $host): bool {
     $interval = (int) ($this->configFactory
@@ -35,19 +41,31 @@ class ScrapeRateLimiter {
 
     $normalized_host = strtolower(trim($host));
     if ($normalized_host === '') {
-      return FALSE;
+      throw new \InvalidArgumentException('A host is required for rate limiting.');
     }
 
-    $key = 'scrape_to_field.host_rate.' . Crypt::hashBase64($normalized_host);
-    $current_time = $this->time->getRequestTime();
-    $last_request = (int) $this->state->get($key, 0);
-
-    if (($current_time - $last_request) < $interval) {
-      return FALSE;
+    $host_hash = Crypt::hashBase64($normalized_host);
+    $key = 'scrape_to_field.host_rate.' . $host_hash;
+    $lock_name = 'scrape_to_field.host_rate_lock.' . $host_hash;
+    if (!$this->lockBackend->acquire($lock_name, 5.0)) {
+      throw new ScrapeRateLimitException(1);
     }
 
-    $this->state->set($key, $current_time);
-    return TRUE;
+    try {
+      $current_time = $this->time->getCurrentTime();
+      $last_request = (int) $this->state->get($key, 0);
+      $elapsed = $current_time - $last_request;
+
+      if ($elapsed < $interval) {
+        throw new ScrapeRateLimitException(max(1, $interval - $elapsed));
+      }
+
+      $this->state->set($key, $current_time);
+      return TRUE;
+    }
+    finally {
+      $this->lockBackend->release($lock_name);
+    }
   }
 
 }

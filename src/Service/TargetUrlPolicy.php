@@ -76,6 +76,25 @@ class TargetUrlPolicy {
    *   Thrown when the URL violates the target policy.
    */
   public function assertAllowed(string $url): void {
+    $this->getAllowedIpAddresses($url);
+  }
+
+  /**
+   * Validates a URL and returns its verified public IP addresses.
+   *
+   * Callers making an outbound request must pin the connection to one of
+   * these addresses so DNS cannot change between validation and connection.
+   *
+   * @param string $url
+   *   The target URL.
+   *
+   * @return string[]
+   *   Public IPv4 or IPv6 addresses resolved for the URL host.
+   *
+   * @throws \InvalidArgumentException
+   *   Thrown when the URL violates the target policy.
+   */
+  public function getAllowedIpAddresses(string $url): array {
     if (!filter_var($url, FILTER_VALIDATE_URL)) {
       throw new \InvalidArgumentException('The URL format is invalid.');
     }
@@ -109,9 +128,12 @@ class TargetUrlPolicy {
 
     $this->assertDomainAllowed($host);
 
-    foreach ($this->resolveHost($host) as $ip_address) {
+    $ip_addresses = $this->resolveHost($host);
+    foreach ($ip_addresses as $ip_address) {
       $this->assertPublicIpAddress($ip_address);
     }
+
+    return $ip_addresses;
   }
 
   /**

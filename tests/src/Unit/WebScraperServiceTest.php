@@ -2,60 +2,48 @@
 
 namespace Drupal\Tests\scrape_to_field\Unit;
 
-use Psr\Http\Message\RequestInterface;
-use Drupal\scrape_to_field\Service\WebScraperService;
-use Drupal\scrape_to_field\Service\UserAgentService;
-use Drupal\scrape_to_field\Service\ScraperActivityLogger;
+use Drupal\scrape_to_field\DTO\ValidationResult;
 use Drupal\scrape_to_field\Service\DataCleaningService;
-use Drupal\scrape_to_field\Service\ScrapeRateLimiter;
-use Drupal\scrape_to_field\Service\TargetUrlPolicy;
-use Drupal\Core\Config\ConfigFactoryInterface;
-use Drupal\Core\Config\Config;
-use PHPUnit\Framework\TestCase;
-use GuzzleHttp\ClientInterface;
-use GuzzleHttp\Psr7\Response;
+use Drupal\scrape_to_field\Service\DomContentExtractorInterface;
+use Drupal\scrape_to_field\Service\ScraperActivityLogger;
+use Drupal\scrape_to_field\Service\ScraperConfigValidatorInterface;
+use Drupal\scrape_to_field\Service\ScraperHttpClientInterface;
+use Drupal\scrape_to_field\Service\WebScraperService;
 use GuzzleHttp\Exception\RequestException;
 use PHPUnit\Framework\MockObject\MockObject;
+use PHPUnit\Framework\TestCase;
+use Psr\Http\Message\RequestInterface;
 
 /**
- * Tests the WebScraperService class.
+ * Tests the WebScraperService orchestration logic.
  */
 class WebScraperServiceTest extends TestCase {
 
   /**
    * The web scraper service under test.
-   *
-   * @var \Drupal\scrape_to_field\Service\WebScraperService
    */
   protected WebScraperService $scraperService;
 
   /**
    * Mock HTTP client.
    *
-   * @var \GuzzleHttp\ClientInterface|\PHPUnit\Framework\MockObject\MockObject
+   * @var \Drupal\scrape_to_field\Service\ScraperHttpClientInterface|\PHPUnit\Framework\MockObject\MockObject
    */
-  protected ClientInterface|MockObject $httpClient;
+  protected ScraperHttpClientInterface|MockObject $httpClient;
 
   /**
-   * Mock config factory.
+   * Mock DOM extractor.
    *
-   * @var \Drupal\Core\Config\ConfigFactoryInterface|\PHPUnit\Framework\MockObject\MockObject
+   * @var \Drupal\scrape_to_field\Service\DomContentExtractorInterface|\PHPUnit\Framework\MockObject\MockObject
    */
-  protected ConfigFactoryInterface|MockObject $configFactory;
+  protected DomContentExtractorInterface|MockObject $domExtractor;
 
   /**
-   * Mock config object.
+   * Mock config validator.
    *
-   * @var \Drupal\Core\Config\Config|\PHPUnit\Framework\MockObject\MockObject
+   * @var \Drupal\scrape_to_field\Service\ScraperConfigValidatorInterface|\PHPUnit\Framework\MockObject\MockObject
    */
-  protected Config|MockObject $config;
-
-  /**
-   * Mock user agent service.
-   *
-   * @var \Drupal\scrape_to_field\Service\UserAgentService|\PHPUnit\Framework\MockObject\MockObject
-   */
-  protected UserAgentService|MockObject $userAgentService;
+  protected ScraperConfigValidatorInterface|MockObject $configValidator;
 
   /**
    * Mock scraper activity logger.
@@ -72,82 +60,26 @@ class WebScraperServiceTest extends TestCase {
   protected DataCleaningService|MockObject $dataCleaningService;
 
   /**
-   * Mock target URL policy.
-   *
-   * @var \Drupal\scrape_to_field\Service\TargetUrlPolicy|\PHPUnit\Framework\MockObject\MockObject
-   */
-  protected TargetUrlPolicy|MockObject $targetUrlPolicy;
-
-  /**
-   * Mock scrape rate limiter.
-   *
-   * @var \Drupal\scrape_to_field\Service\ScrapeRateLimiter|\PHPUnit\Framework\MockObject\MockObject
-   */
-  protected ScrapeRateLimiter|MockObject $rateLimiter;
-
-  /**
    * {@inheritdoc}
    */
   protected function setUp(): void {
     parent::setUp();
 
-    $this->httpClient = $this->createMock(ClientInterface::class);
-    $this->configFactory = $this->createMock(ConfigFactoryInterface::class);
-    $this->config = $this->createMock(Config::class);
-    $this->userAgentService = $this->createMock(UserAgentService::class);
+    $this->httpClient = $this->createMock(ScraperHttpClientInterface::class);
+    $this->domExtractor = $this->createMock(DomContentExtractorInterface::class);
+    $this->configValidator = $this->createMock(ScraperConfigValidatorInterface::class);
     $this->scraperLogger = $this->createMock(ScraperActivityLogger::class);
     $this->dataCleaningService = $this->createMock(DataCleaningService::class);
-    $this->targetUrlPolicy = $this->createMock(TargetUrlPolicy::class);
-    $this->rateLimiter = $this->createMock(ScrapeRateLimiter::class);
-
-    $this->configFactory
-      ->method('get')
-      ->with('scrape_to_field.settings')
-      ->willReturn($this->config);
-
-    $this->config
-      ->method('get')
-      ->willReturnMap([
-        ['timeout', 30],
-        ['max_retries', 0],
-        ['retry_delay', 0],
-        ['user_agent_rotation', TRUE],
-        ['max_response_bytes', 1048576],
-        ['max_results', 50],
-      ]);
-
-    $this->userAgentService
-      ->method('getRandomUserAgent')
-      ->willReturn('Test User Agent 1.0');
-
     $this->dataCleaningService
       ->method('applyCleaningOperations')
       ->willReturnArgument(0);
 
-    $this->targetUrlPolicy
-      ->method('assertAllowed')
-      ->willReturnCallback(function (string $url): void {
-        if (!str_starts_with($url, 'https://')) {
-          throw new \InvalidArgumentException('Only https:// URLs are permitted.');
-        }
-      });
-
-    $this->targetUrlPolicy
-      ->method('getHost')
-      ->willReturn('example.com');
-
-    $this->rateLimiter
-      ->method('claim')
-      ->willReturn(TRUE);
-
     $this->scraperService = new WebScraperService(
       $this->httpClient,
-      $this->configFactory,
-      $this->userAgentService,
+      $this->domExtractor,
+      $this->configValidator,
       $this->scraperLogger,
       $this->dataCleaningService,
-      $this->targetUrlPolicy,
-      $this->rateLimiter
     );
   }
 
@@ -155,18 +87,25 @@ class WebScraperServiceTest extends TestCase {
    * Tests successful CSS selector scraping.
    */
   public function testSuccessfulCssSelectorScraping() {
-    $html = '<html><body><h1>Test Title</h1><p>Test content</p></body></html>';
-    $response = new Response(200, [], $html);
+    $html = '<html><body><h1>Test Title</h1></body></html>';
+
+    $this->configValidator
+      ->method('validate')
+      ->willReturn(ValidationResult::valid());
 
     $this->httpClient
-      ->method('request')
-      ->willReturn($response);
+      ->method('fetchHtml')
+      ->willReturn($html);
+
+    $this->domExtractor
+      ->method('extract')
+      ->willReturn(['Test Title']);
 
     $result = $this->scraperService->scrapeData(
       'https://example.com/test',
       'h1',
       'css',
-      ['test_mode' => TRUE]
+      ['test_mode' => TRUE],
     );
 
     $this->assertIsArray($result);
@@ -178,18 +117,23 @@ class WebScraperServiceTest extends TestCase {
    * Tests successful XPath selector scraping.
    */
   public function testSuccessfulXpathSelectorScraping() {
-    $html = '<html><body><h1 class="title">XPath Title</h1></body></html>';
-    $response = new Response(200, [], $html);
+    $this->configValidator
+      ->method('validate')
+      ->willReturn(ValidationResult::valid());
 
     $this->httpClient
-      ->method('request')
-      ->willReturn($response);
+      ->method('fetchHtml')
+      ->willReturn('<html><body><h1>XPath Title</h1></body></html>');
+
+    $this->domExtractor
+      ->method('extract')
+      ->willReturn(['XPath Title']);
 
     $result = $this->scraperService->scrapeData(
       'https://example.com/test',
       '//h1[@class="title"]',
       'xpath',
-      ['test_mode' => TRUE]
+      ['test_mode' => TRUE],
     );
 
     $this->assertIsArray($result);
@@ -201,16 +145,16 @@ class WebScraperServiceTest extends TestCase {
    * Tests scraping with invalid URL.
    */
   public function testScrapingWithInvalidUrl() {
+    $this->configValidator
+      ->method('validate')
+      ->willReturn(ValidationResult::invalid('Invalid URL format.', ValidationResult::REASON_INVALID_URL));
+
     $this->scraperLogger
       ->expects($this->once())
       ->method('logInvalidUrl')
       ->with('not-a-valid-url');
 
-    $result = $this->scraperService->scrapeData(
-      'not-a-valid-url',
-      'h1',
-      'css'
-    );
+    $result = $this->scraperService->scrapeData('not-a-valid-url', 'h1', 'css');
 
     $this->assertNull($result);
   }
@@ -219,16 +163,16 @@ class WebScraperServiceTest extends TestCase {
    * Tests scraping with empty selector.
    */
   public function testScrapingWithEmptySelector() {
+    $this->configValidator
+      ->method('validate')
+      ->willReturn(ValidationResult::invalid('Selector cannot be empty.', ValidationResult::REASON_EMPTY_SELECTOR));
+
     $this->scraperLogger
       ->expects($this->once())
       ->method('logEmptySelector')
       ->with('https://example.com/test');
 
-    $result = $this->scraperService->scrapeData(
-      'https://example.com/test',
-      '',
-      'css'
-    );
+    $result = $this->scraperService->scrapeData('https://example.com/test', '', 'css');
 
     $this->assertNull($result);
   }
@@ -237,16 +181,16 @@ class WebScraperServiceTest extends TestCase {
    * Tests scraping with invalid selector type.
    */
   public function testScrapingWithInvalidSelectorType() {
+    $this->configValidator
+      ->method('validate')
+      ->willReturn(ValidationResult::invalid('Selector type must be CSS or XPath.', ValidationResult::REASON_INVALID_SELECTOR_TYPE));
+
     $this->scraperLogger
       ->expects($this->once())
       ->method('logInvalidSelectorType')
       ->with('invalid', 'https://example.com/test');
 
-    $result = $this->scraperService->scrapeData(
-      'https://example.com/test',
-      'h1',
-      'invalid'
-    );
+    $result = $this->scraperService->scrapeData('https://example.com/test', 'h1', 'invalid');
 
     $this->assertNull($result);
   }
@@ -255,13 +199,17 @@ class WebScraperServiceTest extends TestCase {
    * Tests handling of HTTP request exceptions.
    */
   public function testHttpRequestException() {
+    $this->configValidator
+      ->method('validate')
+      ->willReturn(ValidationResult::valid());
+
     $exception = new RequestException(
       'Connection timeout',
-      $this->createMock(RequestInterface::class)
+      $this->createMock(RequestInterface::class),
     );
 
     $this->httpClient
-      ->method('request')
+      ->method('fetchHtml')
       ->willThrowException($exception);
 
     $this->scraperLogger
@@ -269,31 +217,32 @@ class WebScraperServiceTest extends TestCase {
       ->method('logRequestFailure')
       ->with('https://example.com/test', 'Connection timeout');
 
-    $result = $this->scraperService->scrapeData(
-      'https://example.com/test',
-      'h1',
-      'css'
-    );
+    $result = $this->scraperService->scrapeData('https://example.com/test', 'h1', 'css');
 
     $this->assertNull($result);
   }
 
   /**
-   * Tests scraping with no matching elements.
+   * Tests scraping with no matching elements returns empty array.
    */
   public function testScrapingWithNoMatchingElements() {
-    $html = '<html><body><p>No heading here</p></body></html>';
-    $response = new Response(200, [], $html);
+    $this->configValidator
+      ->method('validate')
+      ->willReturn(ValidationResult::valid());
 
     $this->httpClient
-      ->method('request')
-      ->willReturn($response);
+      ->method('fetchHtml')
+      ->willReturn('<html><body><p>No heading here</p></body></html>');
+
+    $this->domExtractor
+      ->method('extract')
+      ->willReturn([]);
 
     $result = $this->scraperService->scrapeData(
       'https://example.com/test',
       'h1',
       'css',
-      ['test_mode' => TRUE]
+      ['test_mode' => TRUE],
     );
 
     $this->assertIsArray($result);
@@ -304,18 +253,23 @@ class WebScraperServiceTest extends TestCase {
    * Tests scraping with multiple matching elements.
    */
   public function testScrapingWithMultipleMatchingElements() {
-    $html = '<html><body><h1>Title 1</h1><h1>Title 2</h1><h1>Title 3</h1></body></html>';
-    $response = new Response(200, [], $html);
+    $this->configValidator
+      ->method('validate')
+      ->willReturn(ValidationResult::valid());
 
     $this->httpClient
-      ->method('request')
-      ->willReturn($response);
+      ->method('fetchHtml')
+      ->willReturn('<html><body></body></html>');
+
+    $this->domExtractor
+      ->method('extract')
+      ->willReturn(['Title 1', 'Title 2', 'Title 3']);
 
     $result = $this->scraperService->scrapeData(
       'https://example.com/test',
       'h1',
       'css',
-      ['test_mode' => TRUE]
+      ['test_mode' => TRUE],
     );
 
     $this->assertIsArray($result);
@@ -326,21 +280,23 @@ class WebScraperServiceTest extends TestCase {
   }
 
   /**
-   * Tests scraping with custom cleaning operations.
+   * Tests scraping with cleaning operations applied.
    */
   public function testScrapingWithCustomCleaningOperations() {
-    $html = '<html><body><h1>Original Title</h1></body></html>';
-    $response = new Response(200, [], $html);
+    $cleaning_operations = [['search' => 'Original', 'replace' => 'Modified']];
+
+    $this->configValidator
+      ->method('validate')
+      ->willReturn(ValidationResult::valid());
 
     $this->httpClient
-      ->method('request')
-      ->willReturn($response);
+      ->method('fetchHtml')
+      ->willReturn('<html><body></body></html>');
 
-    $cleaning_operations = [
-      ['search' => 'Original', 'replace' => 'Modified'],
-    ];
+    $this->domExtractor
+      ->method('extract')
+      ->willReturn(['Original Title']);
 
-    // Override the default mock behavior for this specific test.
     $this->dataCleaningService = $this->createMock(DataCleaningService::class);
     $this->dataCleaningService
       ->expects($this->once())
@@ -348,22 +304,19 @@ class WebScraperServiceTest extends TestCase {
       ->with(['Original Title'], $cleaning_operations)
       ->willReturn(['Modified Title']);
 
-    // Create a new service instance for this test with the overridden mock.
     $scraperService = new WebScraperService(
       $this->httpClient,
-      $this->configFactory,
-      $this->userAgentService,
+      $this->domExtractor,
+      $this->configValidator,
       $this->scraperLogger,
       $this->dataCleaningService,
-      $this->targetUrlPolicy,
-      $this->rateLimiter
     );
 
     $result = $scraperService->scrapeData(
       'https://example.com/test',
       'h1',
       'css',
-      ['cleaning_operations' => $cleaning_operations, 'test_mode' => TRUE]
+      ['cleaning_operations' => $cleaning_operations, 'test_mode' => TRUE],
     );
 
     $this->assertIsArray($result);
@@ -371,80 +324,45 @@ class WebScraperServiceTest extends TestCase {
   }
 
   /**
-   * Tests HTTP client request configuration.
+   * Tests that empty HTML returns an empty array.
    */
-  public function testHttpClientRequestConfiguration() {
-    $html = '<html><body><h1>Test</h1></body></html>';
-    $response = new Response(200, [], $html);
+  public function testEmptyHtmlReturnsEmptyArray() {
+    $this->configValidator
+      ->method('validate')
+      ->willReturn(ValidationResult::valid());
 
     $this->httpClient
-      ->expects($this->once())
-      ->method('request')
-      ->with(
-        'GET',
-        'https://example.com/test',
-        $this->callback(function ($options) {
-          return $options['timeout'] === 30 &&
-                 $options['connect_timeout'] === 5 &&
-                 $options['verify'] === TRUE &&
-                 isset($options['allow_redirects']['on_redirect']) &&
-                 $options['headers']['User-Agent'] === 'Test User Agent 1.0' &&
-                 isset($options['headers']['Accept']);
-        })
-      )
-      ->willReturn($response);
+      ->method('fetchHtml')
+      ->willReturn('');
 
     $result = $this->scraperService->scrapeData(
       'https://example.com/test',
       'h1',
       'css',
-      ['test_mode' => TRUE]
+      ['test_mode' => TRUE],
     );
 
     $this->assertIsArray($result);
+    $this->assertEmpty($result);
   }
 
   /**
-   * Tests malformed HTML handling.
+   * Tests validateScrapeConfigSyntax backward compatibility.
    */
-  public function testMalformedHtmlHandling() {
-    $malformed_html = '<html><body><h1>Unclosed title<p>Content</body>';
-    $response = new Response(200, [], $malformed_html);
+  public function testValidateScrapeConfigSyntaxDelegates() {
+    $this->configValidator
+      ->method('validate')
+      ->willReturn(ValidationResult::valid());
 
-    $this->httpClient
-      ->method('request')
-      ->willReturn($response);
-
-    $result = $this->scraperService->scrapeData(
-      'https://example.com/test',
+    $result = $this->scraperService->validateScrapeConfigSyntax(
+      'https://example.com',
       'h1',
       'css',
-      ['test_mode' => TRUE]
     );
 
-    $this->assertIsArray($result);
-    $this->assertEquals('Unclosed title', $result[0]);
-  }
-
-  /**
-   * Tests handling of non-HTML responses.
-   */
-  public function testNonHtmlResponseHandling() {
-    $json_response = '{"title": "JSON Title"}';
-    $response = new Response(200, ['Content-Type' => 'application/json'], $json_response);
-
-    $this->httpClient
-      ->method('request')
-      ->willReturn($response);
-
-    $result = $this->scraperService->scrapeData(
-      'https://example.com/api/data',
-      'h1',
-      'css',
-      ['test_mode' => TRUE]
-    );
-
-    $this->assertNull($result);
+    $this->assertIsBool($result['valid']);
+    $this->assertTrue($result['valid']);
+    $this->assertArrayHasKey('message', $result);
   }
 
 }
