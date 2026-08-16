@@ -11,62 +11,63 @@ use Drupal\Core\Session\AccountProxyInterface;
 use Drupal\node\NodeInterface;
 use Drupal\scrape_to_field\DTO\NodeScraperConfigDto;
 use Drupal\scrape_to_field\DTO\ScraperFieldConfigDto;
+use Drupal\scrape_to_field\Repository\NodeScraperConfigRepositoryInterface;
 use Drupal\scrape_to_field\Service\DataCleaningService;
 use Drupal\scrape_to_field\Service\ScraperActivityLogger;
+use Drupal\scrape_to_field\Service\ScraperConfigValidatorInterface;
+use Drupal\scrape_to_field\Service\ScraperFieldDiscoveryInterface;
 use Drupal\scrape_to_field\Service\WebScraperService;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 
 /**
  * Form for configuring scrape to field settings per node.
  */
-class NodeScraperConfigForm extends FormBase {
-
-  /**
-   * The entity type manager.
-   */
-  protected EntityTypeManagerInterface $entityTypeManager;
-
-  /**
-   * The web scraper service.
-   */
-  protected WebScraperService $scraperService;
-
-  /**
-   * The scraper activity logger.
-   */
-  protected ScraperActivityLogger $scraperLogger;
-
-  /**
-   * The data cleaning service.
-   */
-  protected DataCleaningService $dataCleaningService;
-
-  /**
-   * The current user.
-   */
-  protected AccountProxyInterface $currentUser;
+final class NodeScraperConfigForm extends FormBase {
 
   /**
    * Constructs a NodeScraperConfigForm object.
+   *
+   * @param \Drupal\Core\Entity\EntityTypeManagerInterface $entityTypeManager
+   *   The entity type manager.
+   * @param \Drupal\scrape_to_field\Service\WebScraperService $scraperService
+   *   The web scraper service, used for AJAX test scrapes.
+   * @param \Drupal\scrape_to_field\Service\ScraperActivityLogger $scraperLogger
+   *   The activity logger.
+   * @param \Drupal\scrape_to_field\Service\DataCleaningService $dataCleaningService
+   *   The data cleaning service.
+   * @param \Drupal\Core\Session\AccountProxyInterface $currentUser
+   *   The current user.
+   * @param \Drupal\scrape_to_field\Repository\NodeScraperConfigRepositoryInterface $configRepository
+   *   The node scraper config repository.
+   * @param \Drupal\scrape_to_field\Service\ScraperFieldDiscoveryInterface $fieldDiscovery
+   *   The field discovery service.
+   * @param \Drupal\scrape_to_field\Service\ScraperConfigValidatorInterface $configValidator
+   *   The config validator.
    */
-  public function __construct(EntityTypeManagerInterface $entity_type_manager, WebScraperService $scraper_service, ScraperActivityLogger $scraper_logger, DataCleaningService $data_cleaning_service, AccountProxyInterface $current_user) {
-    $this->entityTypeManager = $entity_type_manager;
-    $this->scraperService = $scraper_service;
-    $this->scraperLogger = $scraper_logger;
-    $this->dataCleaningService = $data_cleaning_service;
-    $this->currentUser = $current_user;
-  }
+  public function __construct(
+    protected EntityTypeManagerInterface $entityTypeManager,
+    protected WebScraperService $scraperService,
+    protected ScraperActivityLogger $scraperLogger,
+    protected DataCleaningService $dataCleaningService,
+    protected AccountProxyInterface $currentUser,
+    protected NodeScraperConfigRepositoryInterface $configRepository,
+    protected ScraperFieldDiscoveryInterface $fieldDiscovery,
+    protected ScraperConfigValidatorInterface $configValidator,
+  ) {}
 
   /**
    * {@inheritdoc}
    */
-  public static function create(ContainerInterface $container) {
+  public static function create(ContainerInterface $container): static {
     return new static(
       $container->get('entity_type.manager'),
       $container->get('scrape_to_field.scraper'),
       $container->get('scrape_to_field.activity_logger'),
       $container->get('scrape_to_field.data_cleaning'),
       $container->get('current_user'),
+      $container->get('scrape_to_field.node_config_repository'),
+      $container->get('scrape_to_field.field_discovery'),
+      $container->get('scrape_to_field.config_validator'),
     );
   }
 
@@ -87,11 +88,8 @@ class NodeScraperConfigForm extends FormBase {
 
     $form_state->set('node', $node);
 
-    // Get current scraper configuration.
-    $current_config = $this->getNodeScraperConfig($node);
-
-    // Get all scraper-enabled fields for this node type.
-    $scraper_fields = $this->getScraperEnabledFields($node);
+    $current_config = $this->configRepository->getConfig($node);
+    $scraper_fields = $this->fieldDiscovery->getSupportedFields($node);
 
     if (empty($scraper_fields)) {
       $form['no_fields'] = [
@@ -456,13 +454,13 @@ class NodeScraperConfigForm extends FormBase {
       return $result;
     }
 
-    $validation = $this->scraperService->validateScrapeConfigSyntax(
+    $validation = $this->configValidator->validate(
       $field_values['source_config']['url'],
       $field_values['source_config']['selector'],
       $field_values['source_config']['selector_type'] ?? 'css'
     );
-    if (!$validation['valid']) {
-      $result['message'] = $this->buildTestMessage('error', $validation['message']);
+    if (!$validation->isValid()) {
+      $result['message'] = $this->buildTestMessage('error', $validation->getMessage());
       return $result;
     }
 
@@ -541,7 +539,7 @@ class NodeScraperConfigForm extends FormBase {
       return;
     }
 
-    $scraper_fields = $this->getScraperEnabledFields($node);
+    $scraper_fields = $this->fieldDiscovery->getSupportedFields($node);
 
     foreach ($scraper_fields as $field_name => $field_definition) {
       $field_values = $form_state->getValue('field_' . $field_name);
@@ -581,18 +579,18 @@ class NodeScraperConfigForm extends FormBase {
 
         // Validate the scraper configuration without making HTTP requests.
         if (!empty($field_values['source_config']['url']) && !empty($field_values['source_config']['selector'])) {
-          $validation = $this->scraperService->validateScrapeConfigSyntax(
+          $validation = $this->configValidator->validate(
             $field_values['source_config']['url'],
             $field_values['source_config']['selector'],
             $field_values['source_config']['selector_type'] ?? 'css'
           );
 
-          if (!$validation['valid']) {
+          if (!$validation->isValid()) {
             $form_state->setErrorByName(
               'field_' . $field_name . '][source_config][selector',
               $this->t('Scraper configuration error for @field: @message', [
                 '@field' => $field_definition->getLabel(),
-                '@message' => $validation['message'],
+                '@message' => $validation->getMessage(),
               ])
             );
           }
@@ -622,17 +620,18 @@ class NodeScraperConfigForm extends FormBase {
     $global_settings = $form_state->getValue('global_settings');
 
     if (empty($global_settings['scraping_enabled'])) {
-      // Clear all scraper configuration if scraping is disabled.
-      $node->set('field_scraper_config', '');
-      $node->save();
-
+      $current_config = $this->configRepository->getConfig($node);
+      $this->configRepository->saveConfig(
+        $node,
+        new NodeScraperConfigDto(FALSE, $current_config->fieldConfigs),
+      );
       $this->scraperLogger->logConfigurationChange($node);
-
+      $form_state->setRedirect('entity.node.canonical', ['node' => $node->id()]);
       return;
     }
 
     $scraper_field_configs = [];
-    $scraper_fields = $this->getScraperEnabledFields($node);
+    $scraper_fields = $this->fieldDiscovery->getSupportedFields($node);
 
     foreach ($scraper_fields as $field_name => $field_definition) {
       $field_values = $form_state->getValue('field_' . $field_name);
@@ -653,7 +652,7 @@ class NodeScraperConfigForm extends FormBase {
 
     $node_scraper_config = new NodeScraperConfigDto(TRUE, $scraper_field_configs);
     try {
-      $node->set('field_scraper_config', $node_scraper_config->toJson());
+      $this->configRepository->saveConfig($node, $node_scraper_config);
     }
     catch (\JsonException $exception) {
       $this->messenger()->addError($this->t('Unable to save scraper configuration.'));
@@ -662,69 +661,8 @@ class NodeScraperConfigForm extends FormBase {
       return;
     }
 
-    $node->save();
-
     $this->scraperLogger->logConfigurationChange($node);
-
     $form_state->setRedirect('entity.node.canonical', ['node' => $node->id()]);
-  }
-
-  /**
-   * Gets scraper-enabled fields for a node type.
-   */
-  protected function getScraperEnabledFields(NodeInterface $node): array {
-    $fields = [];
-    $field_definitions = $node->getFieldDefinitions();
-
-    // Supported field types for scraping.
-    $supported_field_types = [
-      'string',
-      'string_long',
-      'text',
-      'text_long',
-      'integer',
-      'decimal',
-      'float',
-    ];
-
-    foreach ($field_definitions as $field_name => $field_definition) {
-      // Skip base fields.
-      if ($field_definition->getFieldStorageDefinition()->isBaseField()) {
-        continue;
-      }
-
-      $field_type = $field_definition->getType();
-      if (in_array($field_type, $supported_field_types)) {
-        $fields[$field_name] = $field_definition;
-      }
-    }
-
-    return $fields;
-  }
-
-  /**
-   * Gets current scraper configuration for a node.
-   */
-  protected function getNodeScraperConfig(NodeInterface $node): NodeScraperConfigDto {
-    if (!$node->hasField('field_scraper_config')) {
-      return NodeScraperConfigDto::disabled();
-    }
-
-    $config_field = $node->get('field_scraper_config');
-    if ($config_field->isEmpty()) {
-      return NodeScraperConfigDto::disabled();
-    }
-
-    $config_value = $config_field->first()->getValue();
-    $json = $config_value['value'] ?? '[]';
-
-    try {
-      return NodeScraperConfigDto::fromJson($json);
-    }
-    catch (\InvalidArgumentException $exception) {
-      $this->scraperLogger->logInvalidConfiguration((int) $node->id(), $exception->getMessage());
-      return NodeScraperConfigDto::disabled();
-    }
   }
 
   /**

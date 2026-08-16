@@ -5,11 +5,11 @@ services:
 
   scrape_to_field.manager:
     class: Drupal\scrape_to_field\Service\ScrapeFieldManager
-    arguments: ['@entity_type.manager', '@scrape_to_field.scraper', '@scrape_to_field.activity_logger', '@scrape_to_field.content_sanitization', '@state', '@lock']
+    arguments: ['@entity_type.manager', '@scrape_to_field.scraper', '@scrape_to_field.activity_logger', '@scrape_to_field.content_sanitization', '@scrape_to_field.state_repository', '@scrape_to_field.node_config_repository', '@scrape_to_field.field_value_writer', '@lock']
 
   scrape_to_field.queue:
     class: Drupal\scrape_to_field\Service\QueueManager
-    arguments: ['@entity_type.manager', '@queue', '@scrape_to_field.manager', '@scrape_to_field.activity_logger', '@config.factory', '@state']
+    arguments: ['@entity_type.manager', '@queue', '@scrape_to_field.activity_logger', '@config.factory', '@scrape_to_field.node_config_repository', '@scrape_to_field.state_repository']
 
   scrape_to_field.http_client:
     class: Drupal\scrape_to_field\Service\ScraperHttpClient
@@ -22,6 +22,21 @@ services:
   scrape_to_field.config_validator:
     class: Drupal\scrape_to_field\Service\ScraperConfigValidator
     arguments: ['@scrape_to_field.target_url_policy']
+
+  scrape_to_field.field_value_writer:
+    class: Drupal\scrape_to_field\Service\FieldValueWriter
+    arguments: ['@entity_type.manager', '@?Drupal\filter\FilterFormatRepositoryInterface']
+
+  scrape_to_field.field_discovery:
+    class: Drupal\scrape_to_field\Service\ScraperFieldDiscovery
+
+  scrape_to_field.state_repository:
+    class: Drupal\scrape_to_field\Repository\ScraperStateRepository
+    arguments: ['@state', '@database']
+
+  scrape_to_field.node_config_repository:
+    class: Drupal\scrape_to_field\Repository\NodeScraperConfigRepository
+    arguments: ['@scrape_to_field.activity_logger']
 
   scrape_to_field.content_sanitization:
     class: Drupal\scrape_to_field\Service\ContentSanitizationService

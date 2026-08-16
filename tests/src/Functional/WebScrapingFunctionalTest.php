@@ -328,8 +328,8 @@ class WebScrapingFunctionalTest extends BrowserTestBase {
           ->getStorage('node')
           ->loadUnchanged($node->id());
 
-        $scraper_manager = \Drupal::service('scrape_to_field.manager');
-        $config = $scraper_manager->getNodeScraperConfig($node);
+        $config_repository = \Drupal::service('scrape_to_field.node_config_repository');
+        $config = $config_repository->getConfig($node)->toArray();
 
         $this->assertCount(2, $config, 'Both field configurations should be saved');
 

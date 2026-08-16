@@ -12,7 +12,7 @@ use Symfony\Component\DependencyInjection\ContainerInterface;
 /**
  * Configure scrape to field settings.
  */
-class WebScraperSettingsForm extends ConfigFormBase {
+final class WebScraperSettingsForm extends ConfigFormBase {
 
   /**
    * The scraped content sanitization service.
@@ -30,7 +30,7 @@ class WebScraperSettingsForm extends ConfigFormBase {
   /**
    * {@inheritdoc}
    */
-  public static function create(ContainerInterface $container) {
+  public static function create(ContainerInterface $container): static {
     return new static(
       $container->get('config.factory'),
       $container->get('config.typed'),

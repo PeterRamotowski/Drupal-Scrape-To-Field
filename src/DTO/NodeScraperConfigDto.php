@@ -24,12 +24,29 @@ class NodeScraperConfigDto {
    * Creates a DTO from array configuration.
    */
   public static function fromArray(array $config, bool $scrapingEnabled = TRUE): self {
+    if (array_key_exists('scraping_enabled', $config) || array_key_exists('fields', $config)) {
+      if (!isset($config['scraping_enabled']) || !is_bool($config['scraping_enabled'])) {
+        throw new \InvalidArgumentException('The scraping_enabled value must be a boolean.');
+      }
+      if (!isset($config['fields']) || !is_array($config['fields'])) {
+        throw new \InvalidArgumentException('The scraper fields value must be an array.');
+      }
+
+      $scrapingEnabled = $config['scraping_enabled'];
+      $config = $config['fields'];
+    }
+
     $fieldConfigs = [];
 
     foreach ($config as $fieldName => $fieldConfig) {
-      if (is_array($fieldConfig)) {
-        $fieldConfigs[$fieldName] = ScraperFieldConfigDto::fromArray($fieldConfig);
+      if (!is_string($fieldName) || !str_starts_with($fieldName, 'field_')) {
+        throw new \InvalidArgumentException('Scraper field names must use the field_ prefix.');
       }
+      if (!is_array($fieldConfig)) {
+        throw new \InvalidArgumentException('Each scraper field configuration must be an array.');
+      }
+
+      $fieldConfigs[$fieldName] = ScraperFieldConfigDto::fromArray($fieldConfig);
     }
 
     return new self($scrapingEnabled, $fieldConfigs);
@@ -76,7 +93,10 @@ class NodeScraperConfigDto {
    *   Thrown when the configuration cannot be encoded.
    */
   public function toJson(): string {
-    return json_encode($this->toArray(), JSON_THROW_ON_ERROR);
+    return json_encode([
+      'scraping_enabled' => $this->scrapingEnabled,
+      'fields' => $this->toArray(),
+    ], JSON_THROW_ON_ERROR);
   }
 
   /**

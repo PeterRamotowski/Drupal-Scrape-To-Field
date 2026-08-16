@@ -30,6 +30,8 @@ class ScraperFieldConfigDto {
    * Creates a DTO from array configuration.
    */
   public static function fromArray(array $config): self {
+    self::assertValidStoredTypes($config);
+
     return new self(
       enabled: $config['enabled'] ?? FALSE,
       url: $config['url'] ?? '',
@@ -139,6 +141,51 @@ class ScraperFieldConfigDto {
    */
   public static function disabled(): self {
     return new self(enabled: FALSE, url: '', selector: '', selectorType: 'css', extractMethod: 'text');
+  }
+
+  /**
+   * Validates scalar and collection types read from stored JSON.
+   *
+   * @throws \InvalidArgumentException
+   *   Thrown when a stored value has an unexpected type.
+   */
+  private static function assertValidStoredTypes(array $config): void {
+    $boolean_keys = ['enabled', 'enable_cleaning'];
+    foreach ($boolean_keys as $key) {
+      if (isset($config[$key]) && !is_bool($config[$key])) {
+        throw new \InvalidArgumentException("The {$key} value must be a boolean.");
+      }
+    }
+
+    $string_keys = [
+      'url',
+      'selector',
+      'selector_type',
+      'extract_method',
+      'attribute',
+      'multiple_handling',
+      'separator',
+      'text_format',
+      'frequency',
+    ];
+    foreach ($string_keys as $key) {
+      if (isset($config[$key]) && !is_string($config[$key])) {
+        throw new \InvalidArgumentException("The {$key} value must be a string.");
+      }
+    }
+
+    if (isset($config['cleaning_operations']) && !is_array($config['cleaning_operations'])) {
+      throw new \InvalidArgumentException('The cleaning_operations value must be an array.');
+    }
+
+    foreach ($config['cleaning_operations'] ?? [] as $operation) {
+      if (!is_array($operation)
+        || !is_string($operation['search'] ?? NULL)
+        || (isset($operation['replace']) && !is_string($operation['replace']))
+      ) {
+        throw new \InvalidArgumentException('Each cleaning operation must contain string values.');
+      }
+    }
   }
 
 }

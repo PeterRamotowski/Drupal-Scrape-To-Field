@@ -6,6 +6,7 @@ use Drupal\node\Entity\Node;
 use Drupal\scrape_to_field\DTO\NodeScraperConfigDto;
 use Drupal\scrape_to_field\DTO\ScraperFieldConfigDto;
 use Drupal\scrape_to_field\Service\ScrapeFieldManager;
+use Drupal\scrape_to_field\Service\ScraperHttpClient;
 use Drupal\scrape_to_field\Service\WebScraperService;
 use Drupal\Tests\BrowserTestBase;
 use GuzzleHttp\Client;
@@ -337,8 +338,8 @@ class WebScrapingWithMockTest extends BrowserTestBase {
   protected function processScrapingQueue($node) {
     $queue = \Drupal::service('queue')->get('scrape_to_field_queue');
 
-    $scraper_manager = \Drupal::service('scrape_to_field.manager');
-    $config = $scraper_manager->getNodeScraperConfig($node);
+    $config_repository = \Drupal::service('scrape_to_field.node_config_repository');
+    $config = $config_repository->getConfig($node)->toArray();
 
     foreach ($config as $field_name => $field_config) {
       if (!empty($field_config['enabled'])) {
@@ -396,15 +397,23 @@ class WebScrapingWithMockTest extends BrowserTestBase {
     // Reset the container services to ensure our mock is used.
     $this->container->set('http_client', $client);
 
-    // Also rebuild the scraper service with the new client.
-    $scraper_service = new WebScraperService(
+    // Rebuild the http client service with the mock Guzzle client.
+    $http_client_service = new ScraperHttpClient(
       $client,
       $this->container->get('config.factory'),
       $this->container->get('scrape_to_field.user_agent'),
+      $this->container->get('scrape_to_field.target_url_policy'),
+      $this->container->get('scrape_to_field.rate_limiter'),
+    );
+    $this->container->set('scrape_to_field.http_client', $http_client_service);
+
+    // Also rebuild the scraper service with the new http client.
+    $scraper_service = new WebScraperService(
+      $http_client_service,
+      $this->container->get('scrape_to_field.dom_extractor'),
+      $this->container->get('scrape_to_field.config_validator'),
       $this->container->get('scrape_to_field.activity_logger'),
       $this->container->get('scrape_to_field.data_cleaning'),
-      $this->container->get('scrape_to_field.target_url_policy'),
-      $this->container->get('scrape_to_field.rate_limiter')
     );
     $this->container->set('scrape_to_field.scraper', $scraper_service);
 
@@ -414,7 +423,9 @@ class WebScrapingWithMockTest extends BrowserTestBase {
       $scraper_service,
       $this->container->get('scrape_to_field.activity_logger'),
       $this->container->get('scrape_to_field.content_sanitization'),
-      $this->container->get('state'),
+      $this->container->get('scrape_to_field.state_repository'),
+      $this->container->get('scrape_to_field.node_config_repository'),
+      $this->container->get('scrape_to_field.field_value_writer'),
       $this->container->get('lock')
     );
     $this->container->set('scrape_to_field.manager', $manager);
