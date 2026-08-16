@@ -2,12 +2,18 @@
 
 namespace Drupal\scrape_to_field\Hook;
 
+use Drupal\Core\Access\AccessResult;
+use Drupal\Core\Access\AccessResultInterface;
+use Drupal\Core\Cache\CacheableMetadata;
 use Drupal\Core\Config\ConfigFactoryInterface;
 use Drupal\Core\Entity\EntityInterface;
 use Drupal\Core\Entity\EntityTypeInterface;
 use Drupal\Core\Field\BaseFieldDefinition;
+use Drupal\Core\Field\FieldDefinitionInterface;
+use Drupal\Core\Field\FieldItemListInterface;
 use Drupal\Core\Hook\Attribute\Hook;
 use Drupal\Core\KeyValueStore\KeyValueFactoryInterface;
+use Drupal\Core\Session\AccountInterface;
 use Drupal\Core\StringTranslation\StringTranslationTrait;
 use Drupal\Core\StringTranslation\TranslatableMarkup;
 use Drupal\Core\Url;
@@ -57,6 +63,7 @@ final class Hooks {
       ->setLabel(new TranslatableMarkup('Scrape to field Configuration'))
       ->setDescription(new TranslatableMarkup('Internal field to store scrape to field configuration data.'))
       ->setDefaultValue('')
+      ->setInternal(TRUE)
       ->setDisplayConfigurable('form', FALSE)
       ->setDisplayConfigurable('view', FALSE)
       ->setDisplayOptions('form', [
@@ -67,6 +74,25 @@ final class Hooks {
       ]);
 
     return $fields;
+  }
+
+  /**
+   * Implements hook_entity_field_access().
+   */
+  #[Hook('entity_field_access')]
+  public function scraperConfigEntityFieldAccess(
+    string $operation,
+    FieldDefinitionInterface $field_definition,
+    AccountInterface $account,
+    ?FieldItemListInterface $items = NULL,
+  ): AccessResultInterface {
+    if ($field_definition->getTargetEntityTypeId() !== 'node'
+      || $field_definition->getName() !== 'field_scraper_config'
+    ) {
+      return AccessResult::neutral();
+    }
+
+    return AccessResult::forbidden('Scraper configuration is internal.');
   }
 
   /**
@@ -88,7 +114,10 @@ final class Hooks {
    * Implements hook_entity_operation().
    */
   #[Hook('entity_operation')]
-  public function scraperEntityOperation(EntityInterface $entity) {
+  public function scraperEntityOperation(
+    EntityInterface $entity,
+    CacheableMetadata $cacheability,
+  ) {
     $operations = [];
 
     if ($entity instanceof NodeInterface) {
@@ -96,7 +125,9 @@ final class Hooks {
         'node' => $entity->id(),
       ]);
 
-      if (!$url->access()) {
+      $access = $url->access(NULL, TRUE);
+      $cacheability->addCacheableDependency($access);
+      if (!$access->isAllowed()) {
         return $operations;
       }
 

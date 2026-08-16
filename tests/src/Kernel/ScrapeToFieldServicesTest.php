@@ -47,6 +47,30 @@ class ScrapeToFieldServicesTest extends KernelTestBase {
 
     $rate_limiter = $this->container->get('scrape_to_field.rate_limiter');
     $this->assertInstanceOf('Drupal\scrape_to_field\Service\ScrapeRateLimiter', $rate_limiter);
+
+    $http_client = $this->container->get('scrape_to_field.http_client');
+    $this->assertInstanceOf('Drupal\scrape_to_field\Service\ScraperHttpClientInterface', $http_client);
+
+    $dom_extractor = $this->container->get('scrape_to_field.dom_extractor');
+    $this->assertInstanceOf('Drupal\scrape_to_field\Service\DomContentExtractorInterface', $dom_extractor);
+
+    $config_validator = $this->container->get('scrape_to_field.config_validator');
+    $this->assertInstanceOf('Drupal\scrape_to_field\Service\ScraperConfigValidatorInterface', $config_validator);
+
+    $field_value_writer = $this->container->get('scrape_to_field.field_value_writer');
+    $this->assertInstanceOf('Drupal\scrape_to_field\Service\FieldValueWriterInterface', $field_value_writer);
+
+    $field_discovery = $this->container->get('scrape_to_field.field_discovery');
+    $this->assertInstanceOf('Drupal\scrape_to_field\Service\ScraperFieldDiscoveryInterface', $field_discovery);
+
+    $state_repository = $this->container->get('scrape_to_field.state_repository');
+    $this->assertInstanceOf('Drupal\scrape_to_field\Repository\ScraperStateRepositoryInterface', $state_repository);
+
+    $node_config_repository = $this->container->get('scrape_to_field.node_config_repository');
+    $this->assertInstanceOf('Drupal\scrape_to_field\Repository\NodeScraperConfigRepositoryInterface', $node_config_repository);
+
+    $uninstall_handler = $this->container->get('scrape_to_field.uninstall_handler');
+    $this->assertInstanceOf('Drupal\scrape_to_field\Service\ModuleUninstallHandler', $uninstall_handler);
   }
 
   /**

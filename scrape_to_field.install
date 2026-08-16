@@ -17,6 +17,7 @@ function scrape_to_field_install() {
     ->setLabel(new TranslatableMarkup('Scrape to field Configuration'))
     ->setDescription(new TranslatableMarkup('Internal field to store scrape to field configuration data.'))
     ->setDefaultValue('')
+    ->setInternal(TRUE)
     ->setDisplayConfigurable('form', FALSE)
     ->setDisplayConfigurable('view', FALSE)
     ->setDisplayOptions('form', [
@@ -76,4 +77,21 @@ function scrape_to_field_update_11001() {
   }
 
   $config->clear('verify_ssl')->save(TRUE);
+}
+
+/**
+ * Marks the scraper configuration base field as internal.
+ */
+function scrape_to_field_update_11002() {
+  $entity_definition_update_manager = \Drupal::entityDefinitionUpdateManager();
+  $field_definition = $entity_definition_update_manager
+    ->getFieldStorageDefinition('field_scraper_config', 'node');
+
+  if ($field_definition instanceof BaseFieldDefinition
+    && !$field_definition->isInternal()
+  ) {
+    $field_definition->setInternal(TRUE);
+    $entity_definition_update_manager
+      ->updateFieldStorageDefinition($field_definition);
+  }
 }

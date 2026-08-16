@@ -38,6 +38,10 @@ services:
     class: Drupal\scrape_to_field\Repository\NodeScraperConfigRepository
     arguments: ['@scrape_to_field.activity_logger']
 
+  scrape_to_field.uninstall_handler:
+    class: Drupal\scrape_to_field\Service\ModuleUninstallHandler
+    arguments: ['@database', '@entity.definition_update_manager', '@state', '@keyvalue']
+
   scrape_to_field.content_sanitization:
     class: Drupal\scrape_to_field\Service\ContentSanitizationService
     arguments: ['@config.factory']
@@ -62,7 +66,7 @@ services:
 
   scrape_to_field.hooks:
     class: Drupal\scrape_to_field\Hook\Hooks
-    arguments: 
+    arguments:
       - '@config.factory'
       - '@scrape_to_field.activity_logger'
       - '@scrape_to_field.queue'
