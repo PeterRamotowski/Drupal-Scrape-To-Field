@@ -165,6 +165,50 @@ class ScraperActivityLogger {
   }
 
   /**
+   * Logs a queue item that exhausted its processing retry budget.
+   *
+   * @param int $node_id
+   *   The node ID.
+   * @param string|null $field_name
+   *   The field machine name, or NULL for a node-wide job.
+   * @param int $attempts
+   *   The number of failed attempts.
+   */
+  public function logQueueRetriesExhausted(
+    int $node_id,
+    ?string $field_name,
+    int $attempts,
+  ): void {
+    $this->logger->error('Scrape queue retries exhausted for node @nid, field @field after @attempts attempts.', [
+      '@nid' => $node_id,
+      '@field' => $field_name ?: 'all',
+      '@attempts' => $attempts,
+    ]);
+  }
+
+  /**
+   * Logs an exception raised while processing a scrape queue item.
+   *
+   * @param int $node_id
+   *   The node ID being processed.
+   * @param string|null $field_name
+   *   The field machine name, or NULL for a node-wide job.
+   * @param string $reason
+   *   The exception message.
+   */
+  public function logQueueProcessingFailure(
+    int $node_id,
+    ?string $field_name,
+    string $reason,
+  ): void {
+    $this->logger->error('Scrape queue processing failed for node @nid, field @field: @reason', [
+      '@nid' => $node_id,
+      '@field' => $field_name ?: 'all',
+      '@reason' => $reason ?: 'Unknown processing error',
+    ]);
+  }
+
+  /**
    * Log entity validation failures before scraped data is saved.
    */
   public function logValidationFailure(NodeInterface $node, string $reason): void {
